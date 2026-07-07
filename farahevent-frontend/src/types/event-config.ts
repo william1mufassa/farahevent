@@ -148,6 +148,17 @@ export interface SupportConfig {
   whatsapp_number: string;
 }
 
+/** Instructions de paiement manuel (WU / RIA / MoneyGram) — configurable admin. */
+export interface PaymentManualConfig {
+  beneficiary_name: string | null;
+  beneficiary_country: string | null;
+  beneficiary_city: string | null;
+  /** Équivalents indicatifs en devises du tarif standard (informatif). */
+  amount_eur: number | null;
+  amount_usd: number | null;
+  instructions: Bilingual | null;
+}
+
 export interface EventConfig {
   event: EventInfo;
   design: EventDesign;
@@ -159,6 +170,8 @@ export interface EventConfig {
   faqs: FaqItem[];
   partners: Partner[];
   options: EventOptions;
+  /** null si le paiement manuel n'est pas configuré/activé. */
+  payment_manual: PaymentManualConfig | null;
   footer: FooterConfig;
   support: SupportConfig;
   /** Badge « EN DIRECT » navbar. */

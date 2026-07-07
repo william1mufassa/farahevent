@@ -26,6 +26,8 @@ export interface OrderCreateRequest {
   participant: ParticipantInput;
   payment_mode: PaymentMode;
   payment_method_label?: string | null;
+  /** Vérification Turnstile — ignoré par le backend tant que non implémenté (delta §13). */
+  turnstile_token?: string | null;
 }
 
 export interface OrderCreateResponse {
@@ -46,7 +48,14 @@ export interface OrderPublicStatus {
   payment_mode: PaymentMode | null;
   payment_method_label: string | null;
   event: { id: string | null; name: string | null; slug: string | null; date: string | null };
-  formula: { id: string | null; name: string | null };
+  formula: {
+    id: string | null;
+    name: string | null;
+    /** Optionnel — exposé par le backend plus tard (delta §13). */
+    channel?: 'presentiel' | 'online' | 'both' | null;
+  };
   manual_payment_status: string | null;
   created_at: string;
+  /** Aperçu du QR (présentiel, une fois payé) — optionnel, delta §13. */
+  qr_image_url?: string | null;
 }

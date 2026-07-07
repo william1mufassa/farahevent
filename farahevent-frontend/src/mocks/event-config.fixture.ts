@@ -288,6 +288,17 @@ export const MOCK_EVENT_CONFIG: EventConfig = {
       en: 'HORIZONS TECH FORUM • SEPTEMBER 26, 2026 • ABIDJAN',
     },
   },
+  payment_manual: {
+    beneficiary_name: 'FarahEvent SARL',
+    beneficiary_country: 'Côte d’Ivoire',
+    beneficiary_city: 'Abidjan',
+    amount_eur: 53,
+    amount_usd: 57,
+    instructions: {
+      fr: 'Effectuez le transfert au nom du bénéficiaire ci-dessus, puis soumettez la photo de votre reçu. Votre demande sera validée sous 2 à 12 h.',
+      en: 'Send the transfer to the beneficiary above, then upload a photo of your receipt. Your request will be validated within 2 to 12 hours.',
+    },
+  },
   footer: {
     about: {
       fr: 'Le rendez-vous annuel de la tech ouest-africaine, à Abidjan et en ligne.',

@@ -86,7 +86,7 @@ function FormulaCard({
           </div>
         ) : (
           <Link
-            href={`/e/${slug}/acheter?formula=${formula.id}`}
+            href={`/e/${slug}/acheter/${formula.channel === 'online' ? 'en-ligne' : 'presentiel'}?formula=${formula.id}`}
             className="block border border-[var(--color-primary)] px-6 py-3 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white"
           >
             {t('choose')}

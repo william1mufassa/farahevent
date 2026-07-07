@@ -1,76 +1,57 @@
-'use client';
+import type { Metadata } from 'next';
+import { getEventConfig } from '@/lib/api/events';
+import { l } from '@/lib/localized';
+import type { Locale } from '@/lib/i18n/routing';
 
-import { useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useRouter } from '@/lib/i18n/navigation';
-import type { OrderPublicStatus } from '@/types/order';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ThemeInjector } from '@/components/shared/ThemeInjector';
+import { Navbar } from '@/components/shared/Navbar';
+import { PendingStatus } from '@/components/purchase/PendingStatus';
 
-export default function PendingPage() {
-  const t = useTranslations('pending');
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const orderId = searchParams.get('order_id');
+type SearchParams = { order_id?: string; e?: string };
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['order', orderId],
-    queryFn: async () => (await api.get<OrderPublicStatus>(`/orders/${orderId}`)).data,
-    enabled: Boolean(orderId),
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      // Arrête le polling quand le statut est terminal
-      if (s === 'PAID' || s === 'MANUAL_VALIDATED') return false;
-      if (s === 'FAILED' || s === 'REJECTED' || s === 'REFUNDED') return false;
-      return 5000;
-    },
-  });
+export const metadata: Metadata = { robots: { index: false } };
 
-  useEffect(() => {
-    if (!data) return;
-    if (data.status === 'PAID' || data.status === 'MANUAL_VALIDATED') {
-      router.replace(`/confirmation?order_id=${data.id}`);
-    } else if (data.status === 'FAILED' || data.status === 'REJECTED') {
-      router.replace(`/echec?order_id=${data.id}&reason=${data.status}`);
-    }
-  }, [data, router]);
+/**
+ * Paiement manuel soumis (CDC §4.5). Le slug `e` (optionnel) permet de
+ * theming + CTA WhatsApp support depuis la config de l'événement.
+ */
+export default async function PendingPage({
+  params,
+  searchParams,
+}: {
+  params: { locale: string };
+  searchParams: SearchParams;
+}) {
+  const locale = params.locale as Locale;
+  const config = searchParams.e ? await getEventConfig(searchParams.e) : null;
 
-  if (!orderId) {
-    return (
-      <main className="container mx-auto max-w-xl px-4 py-16">
-        <Alert variant="destructive">
-          <AlertDescription>{t('missingOrder')}</AlertDescription>
-        </Alert>
-      </main>
-    );
+  const body = (
+    <main className="container mx-auto max-w-xl px-4 pb-24 pt-24">
+      <PendingStatus
+        orderId={searchParams.order_id ?? null}
+        supportName={config?.support.service_name ?? null}
+        supportWhatsapp={config?.support.whatsapp_number ?? null}
+      />
+    </main>
+  );
+
+  if (!config) {
+    return <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">{body}</div>;
   }
 
   return (
-    <main className="container mx-auto max-w-xl px-4 py-16">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('title')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          {isLoading || !data ? (
-            <Skeleton className="h-6 w-full" />
-          ) : (
-            <>
-              <p>
-                {t('currentStatus')} <strong>{data.status}</strong>
-              </p>
-              <p>
-                {data.event.name} — {data.formula.name}
-              </p>
-              <p>{t('autoRefresh')}</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+    <ThemeInjector design={config.design}>
+      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+        <Navbar
+          eventName={l(config.event.name, locale)}
+          logoUrl={config.event.logo_url}
+          isLive={config.is_live}
+          anchors={[]}
+          homeHref={`/e/${config.event.slug}`}
+          variant="solid"
+        />
+        {body}
+      </div>
+    </ThemeInjector>
   );
 }

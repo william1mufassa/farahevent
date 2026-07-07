@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Link } from '@/lib/i18n/navigation';
 import { LangSwitch } from './LangSwitch';
 import { LiveBadge } from './LiveBadge';
 
@@ -20,18 +21,30 @@ interface NavbarProps {
   logoUrl?: string | null;
   isLive?: boolean;
   anchors: NavAnchor[];
+  /** '#top' sur la landing ; '/e/{slug}' sur les pages secondaires (achat…). */
+  homeHref?: string;
+  /** 'overlay' : transparente sur hero sombre puis opaque au scroll.
+   *  'solid'   : toujours opaque (pages sans hero). */
+  variant?: 'overlay' | 'solid';
 }
 
 /**
  * Navbar publique (CDC §3.1) : fixed top, transparente sur le hero puis opaque
  * au scroll (fond --color-bg + blur), liens d'ancrage smooth-scroll, switch
  * FR/EN, badge EN DIRECT, burger plein écran sur mobile.
- * L'état transparent suppose un hero sombre (photo + overlay) → texte blanc.
  */
-export function Navbar({ eventName, logoUrl, isLive = false, anchors }: NavbarProps) {
+export function Navbar({
+  eventName,
+  logoUrl,
+  isLive = false,
+  anchors,
+  homeHref = '#top',
+  variant = 'overlay',
+}: NavbarProps) {
   const t = useTranslations('nav');
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const solid = variant === 'solid' || scrolled;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -54,14 +67,26 @@ export function Navbar({ eventName, logoUrl, isLive = false, anchors }: NavbarPr
     };
   }, [open]);
 
+  const logo = logoUrl ? (
+    <Image
+      src={logoUrl}
+      alt={eventName}
+      width={120}
+      height={32}
+      className="h-8 w-auto object-contain"
+    />
+  ) : (
+    <span className="truncate text-base font-bold tracking-tight">{eventName}</span>
+  );
+
   return (
     <header
       className={cn(
         'fixed inset-x-0 top-0 z-40 transition-all duration-300',
-        scrolled ? 'text-[var(--color-text)] shadow-sm backdrop-blur-md' : 'text-white',
+        solid ? 'text-[var(--color-text)] shadow-sm backdrop-blur-md' : 'text-white',
       )}
       style={
-        scrolled
+        solid
           ? {
               backgroundColor: 'color-mix(in srgb, var(--color-bg) 88%, transparent)',
               borderBottom: '1px solid color-mix(in srgb, currentColor 10%, transparent)',
@@ -70,19 +95,15 @@ export function Navbar({ eventName, logoUrl, isLive = false, anchors }: NavbarPr
       }
     >
       <nav className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
-        <a href="#top" className="flex min-w-0 items-center gap-3" aria-label={eventName}>
-          {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt={eventName}
-              width={120}
-              height={32}
-              className="h-8 w-auto object-contain"
-            />
-          ) : (
-            <span className="truncate text-base font-bold tracking-tight">{eventName}</span>
-          )}
-        </a>
+        {homeHref.startsWith('#') ? (
+          <a href={homeHref} className="flex min-w-0 items-center gap-3" aria-label={eventName}>
+            {logo}
+          </a>
+        ) : (
+          <Link href={homeHref} className="flex min-w-0 items-center gap-3" aria-label={eventName}>
+            {logo}
+          </Link>
+        )}
 
         <div className="hidden items-center gap-8 md:flex">
           {anchors.map((a) => (
