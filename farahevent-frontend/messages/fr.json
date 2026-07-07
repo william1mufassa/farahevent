@@ -1,0 +1,60 @@
+{
+  "common": {
+    "appName": "FarahEvent",
+    "loading": "Chargement…",
+    "genericError": "Une erreur est survenue, veuillez réessayer.",
+    "backHome": "Retour à l'accueil"
+  },
+  "home": {
+    "title": "FarahEvent",
+    "subtitle": "Sélectionnez un événement pour acheter votre billet.",
+    "loadError": "Impossible de charger les événements pour l'instant.",
+    "empty": "Aucun événement à l'affiche pour le moment.",
+    "featured": "À la une",
+    "venueTbc": "Lieu à confirmer"
+  },
+  "event": {
+    "notFoundTitle": "Événement introuvable",
+    "notFoundDesc": "La billetterie n'est peut-être pas encore ouverte, ou l'URL est incorrecte.",
+    "formulasTitle": "Formules disponibles",
+    "noFormulas": "Aucune formule disponible pour le moment.",
+    "soldOut": "Épuisé",
+    "choose": "Choisir cette formule"
+  },
+  "confirmation": {
+    "title": "Paiement confirmé",
+    "body": "Merci ! Votre billet a été généré et vous sera envoyé par email et WhatsApp dans les prochaines minutes.",
+    "event": "Événement",
+    "formula": "Formule",
+    "amount": "Montant",
+    "reference": "Référence",
+    "notReceived": "Je ne reçois pas mon billet ?"
+  },
+  "pending": {
+    "title": "Paiement en cours de vérification…",
+    "missingOrder": "Identifiant de commande manquant.",
+    "currentStatus": "Statut actuel :",
+    "autoRefresh": "Cette page se met à jour automatiquement. Vous pouvez la fermer, vous serez notifié par email et WhatsApp."
+  },
+  "failure": {
+    "title": "Paiement échoué",
+    "FAILED": "Votre paiement digital n'a pas abouti.",
+    "REJECTED": "Votre preuve de paiement manuel a été rejetée par un administrateur.",
+    "default": "Le paiement n'a pas pu être finalisé.",
+    "backToTickets": "Revenir à la billetterie"
+  },
+  "resend": {
+    "title": "Renvoi de mon billet",
+    "emailLabel": "Email utilisé lors de l'achat",
+    "orderLabel": "Numéro de commande",
+    "orderPlaceholder": "Référence reçue par email",
+    "submit": "Renvoyer mon billet",
+    "submitting": "Envoi…",
+    "success": "Billet renvoyé.",
+    "sentSummary": "{count, plural, one {# billet renvoyé} other {# billets renvoyés}} via {channels}. Pensez à vérifier vos spams."
+  },
+  "notFound": {
+    "title": "Cette page n'existe pas",
+    "desc": "L'adresse demandée est introuvable ou a été déplacée."
+  }
+}

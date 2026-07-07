@@ -1,0 +1,60 @@
+{
+  "common": {
+    "appName": "FarahEvent",
+    "loading": "Loading…",
+    "genericError": "Something went wrong, please try again.",
+    "backHome": "Back to home"
+  },
+  "home": {
+    "title": "FarahEvent",
+    "subtitle": "Select an event to buy your ticket.",
+    "loadError": "Events cannot be loaded right now.",
+    "empty": "No upcoming event at the moment.",
+    "featured": "Featured",
+    "venueTbc": "Venue to be confirmed"
+  },
+  "event": {
+    "notFoundTitle": "Event not found",
+    "notFoundDesc": "Ticketing may not be open yet, or the URL is incorrect.",
+    "formulasTitle": "Available passes",
+    "noFormulas": "No pass available at the moment.",
+    "soldOut": "Sold out",
+    "choose": "Choose this pass"
+  },
+  "confirmation": {
+    "title": "Payment confirmed",
+    "body": "Thank you! Your ticket has been generated and will be sent to you by email and WhatsApp within minutes.",
+    "event": "Event",
+    "formula": "Pass",
+    "amount": "Amount",
+    "reference": "Reference",
+    "notReceived": "Didn't receive your ticket?"
+  },
+  "pending": {
+    "title": "Payment being verified…",
+    "missingOrder": "Missing order identifier.",
+    "currentStatus": "Current status:",
+    "autoRefresh": "This page refreshes automatically. You can close it — you will be notified by email and WhatsApp."
+  },
+  "failure": {
+    "title": "Payment failed",
+    "FAILED": "Your digital payment did not go through.",
+    "REJECTED": "Your manual payment proof was rejected by an administrator.",
+    "default": "The payment could not be completed.",
+    "backToTickets": "Back to ticketing"
+  },
+  "resend": {
+    "title": "Resend my ticket",
+    "emailLabel": "Email used for the purchase",
+    "orderLabel": "Order number",
+    "orderPlaceholder": "Reference received by email",
+    "submit": "Resend my ticket",
+    "submitting": "Sending…",
+    "success": "Ticket sent again.",
+    "sentSummary": "{count, plural, one {# ticket resent} other {# tickets resent}} via {channels}. Remember to check your spam folder."
+  },
+  "notFound": {
+    "title": "This page does not exist",
+    "desc": "The requested address could not be found or has been moved."
+  }
+}
