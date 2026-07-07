@@ -3,7 +3,8 @@
     "appName": "FarahEvent",
     "loading": "Loading…",
     "genericError": "Something went wrong, please try again.",
-    "backHome": "Back to home"
+    "backHome": "Back to home",
+    "close": "Close"
   },
   "nav": {
     "home": "Home",
@@ -29,7 +30,10 @@
     "remaining": "{count, plural, one {# seat left} other {# seats left}}"
   },
   "landing": {
+    "discover": "Discover",
     "aboutTitle": "About",
+    "speakersTitle": "Speakers",
+    "programmeTitle": "Programme",
     "pricingTitle": "Passes & pricing",
     "faqTitle": "Frequently asked questions",
     "partnersTitle": "Our partners",

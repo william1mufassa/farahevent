@@ -3,7 +3,8 @@
     "appName": "FarahEvent",
     "loading": "Chargement…",
     "genericError": "Une erreur est survenue, veuillez réessayer.",
-    "backHome": "Retour à l'accueil"
+    "backHome": "Retour à l'accueil",
+    "close": "Fermer"
   },
   "nav": {
     "home": "Accueil",
@@ -29,7 +30,10 @@
     "remaining": "{count, plural, one {# place restante} other {# places restantes}}"
   },
   "landing": {
+    "discover": "Découvrir",
     "aboutTitle": "À propos",
+    "speakersTitle": "Speakers",
+    "programmeTitle": "Programme",
     "pricingTitle": "Formules & tarifs",
     "faqTitle": "Questions fréquentes",
     "partnersTitle": "Ils nous accompagnent",
