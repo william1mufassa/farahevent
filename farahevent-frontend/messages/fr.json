@@ -5,6 +5,56 @@
     "genericError": "Une erreur est survenue, veuillez réessayer.",
     "backHome": "Retour à l'accueil"
   },
+  "nav": {
+    "home": "Accueil",
+    "about": "À propos",
+    "programme": "Programme",
+    "pricing": "Tarifs",
+    "faq": "FAQ",
+    "speakers": "Speakers",
+    "menu": "Ouvrir le menu",
+    "close": "Fermer le menu"
+  },
+  "live": {
+    "badge": "En direct"
+  },
+  "countdown": {
+    "label": "L'événement commence dans",
+    "days": "jours",
+    "hours": "heures",
+    "minutes": "min",
+    "seconds": "sec"
+  },
+  "tickets": {
+    "remaining": "{count, plural, one {# place restante} other {# places restantes}}"
+  },
+  "landing": {
+    "aboutTitle": "À propos",
+    "pricingTitle": "Formules & tarifs",
+    "faqTitle": "Questions fréquentes",
+    "partnersTitle": "Ils nous accompagnent",
+    "popular": "Populaire",
+    "soldOut": "Épuisé",
+    "choose": "Choisir cette formule"
+  },
+  "footer": {
+    "infoTitle": "Infos",
+    "linksTitle": "Liens",
+    "contactTitle": "Contact",
+    "socialTitle": "Réseaux",
+    "rights": "Tous droits réservés"
+  },
+  "chatbot": {
+    "title": "Une question ?",
+    "defaultService": "Support",
+    "open": "Ouvrir l'aide",
+    "close": "Fermer",
+    "searchPlaceholder": "Rechercher…",
+    "loading": "Chargement…",
+    "noResults": "Aucune réponse dans la FAQ. Contactez le support ci-dessous.",
+    "supportCta": "Contacter {service} sur WhatsApp",
+    "waPrefill": "Bonjour, j'ai une question à propos de l'événement ({event})."
+  },
   "home": {
     "title": "FarahEvent",
     "subtitle": "Sélectionnez un événement pour acheter votre billet.",

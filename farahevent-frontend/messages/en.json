@@ -5,6 +5,56 @@
     "genericError": "Something went wrong, please try again.",
     "backHome": "Back to home"
   },
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "programme": "Programme",
+    "pricing": "Pricing",
+    "faq": "FAQ",
+    "speakers": "Speakers",
+    "menu": "Open menu",
+    "close": "Close menu"
+  },
+  "live": {
+    "badge": "Live"
+  },
+  "countdown": {
+    "label": "The event starts in",
+    "days": "days",
+    "hours": "hours",
+    "minutes": "min",
+    "seconds": "sec"
+  },
+  "tickets": {
+    "remaining": "{count, plural, one {# seat left} other {# seats left}}"
+  },
+  "landing": {
+    "aboutTitle": "About",
+    "pricingTitle": "Passes & pricing",
+    "faqTitle": "Frequently asked questions",
+    "partnersTitle": "Our partners",
+    "popular": "Popular",
+    "soldOut": "Sold out",
+    "choose": "Choose this pass"
+  },
+  "footer": {
+    "infoTitle": "Info",
+    "linksTitle": "Links",
+    "contactTitle": "Contact",
+    "socialTitle": "Social",
+    "rights": "All rights reserved"
+  },
+  "chatbot": {
+    "title": "Any question?",
+    "defaultService": "Support",
+    "open": "Open help",
+    "close": "Close",
+    "searchPlaceholder": "Search…",
+    "loading": "Loading…",
+    "noResults": "No answer found in the FAQ. Reach out to support below.",
+    "supportCta": "Contact {service} on WhatsApp",
+    "waPrefill": "Hello, I have a question about the event ({event})."
+  },
   "home": {
     "title": "FarahEvent",
     "subtitle": "Select an event to buy your ticket.",

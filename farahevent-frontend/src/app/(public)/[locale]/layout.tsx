@@ -23,7 +23,7 @@ export default function PublicLayout({
   if (!routing.locales.includes(locale as Locale)) notFound();
 
   return (
-    <html lang={locale} suppressHydrationWarning className={fontVariables}>
+    <html lang={locale} suppressHydrationWarning className={`${fontVariables} scroll-smooth`}>
       <body>
         <NextIntlClientProvider>
           <QueryProvider>

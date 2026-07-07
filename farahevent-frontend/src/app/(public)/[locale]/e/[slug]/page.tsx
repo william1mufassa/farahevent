@@ -1,135 +1,299 @@
-'use client';
-
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { useTranslations } from 'next-intl';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import type { EventDetailPublic, FormulaPublic } from '@/types/event';
-import { formatEventDate, formatFCFA } from '@/lib/utils';
+
+import { getEventConfig } from '@/lib/api/events';
+import { l } from '@/lib/localized';
+import type { Locale } from '@/lib/i18n/routing';
 import { Link } from '@/lib/i18n/navigation';
-import { ThemeWrapper } from '@/components/theme/ThemeWrapper';
+import { cn, formatFCFA, formatLongDate } from '@/lib/utils';
+import type { EventConfig, FormulaConfig } from '@/types/event-config';
+
+import { ThemeInjector } from '@/components/shared/ThemeInjector';
+import { Navbar, type NavAnchor } from '@/components/shared/Navbar';
+import { Footer } from '@/components/shared/Footer';
+import { CountdownBanner } from '@/components/shared/CountdownBanner';
+import { TicketsCounter } from '@/components/shared/TicketsCounter';
+import { ScrollReveal } from '@/components/shared/ScrollReveal';
 import { ChatbotWidget } from '@/components/chatbot/ChatbotWidget';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 /**
- * Landing provisoire (client, React Query). Remplacée au Lot 2 par la
- * composition RSC + templates (voir CONCEPTION_FRONTEND.md §4.3).
+ * Landing événement — Server Component alimenté par GET /events/{slug}/config
+ * (fixture locale si NEXT_PUBLIC_USE_MOCK=1). Les sections ci-dessous sont la
+ * version « neutre » ; le Lot 2 les remplace par les sections du template
+ * actif (A/B/C/D) via le registry (CONCEPTION_FRONTEND.md §4).
  */
-export default function EventDetailPage() {
-  const t = useTranslations('event');
-  const params = useParams<{ slug: string }>();
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['event', params.slug],
-    queryFn: async () => (await api.get<EventDetailPublic>(`/events/${params.slug}`)).data,
-    enabled: Boolean(params.slug),
-  });
 
-  if (isLoading) {
-    return (
-      <main className="container mx-auto space-y-6 px-4 py-10">
-        <Skeleton className="h-56 w-full" />
-        <Skeleton className="h-32 w-3/4" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      </main>
-    );
-  }
+type Params = { locale: string; slug: string };
 
-  if (isError || !data) {
-    return (
-      <main className="container mx-auto max-w-xl px-4 py-16">
-        <Alert variant="destructive">
-          <AlertTitle>{t('notFoundTitle')}</AlertTitle>
-          <AlertDescription>{t('notFoundDesc')}</AlertDescription>
-        </Alert>
-      </main>
-    );
-  }
+const SOFT_BORDER = { borderColor: 'color-mix(in srgb, currentColor 15%, transparent)' };
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const config = await getEventConfig(params.slug);
+  if (!config) return {};
+  const locale = params.locale as Locale;
+  const name = l(config.event.name, locale);
+  return {
+    title: name,
+    description: stripHtml(l(config.content.description, locale)).slice(0, 160),
+    openGraph: {
+      title: name,
+      images: [{ url: config.content.hero_image_url }],
+    },
+  };
+}
+
+export default async function EventLandingPage({ params }: { params: Params }) {
+  const locale = params.locale as Locale;
+  const config = await getEventConfig(params.slug);
+  if (!config) notFound();
+
+  const t = await getTranslations('landing');
+  const { event, content, options, formulas, faqs, partners } = config;
+  const name = l(event.name, locale);
+
+  // Abidjan = UTC toute l'année ; si un fuseau configurable arrive dans
+  // EventConfig, le calcul se fera côté backend.
+  const targetIso = `${event.date}T${event.start_time}:00Z`;
+
+  const anchors: NavAnchor[] = [
+    { id: 'apropos', key: 'about' },
+    { id: 'tarifs', key: 'pricing' },
+    { id: 'faq', key: 'faq' },
+  ];
+
+  const showPresentielCta = event.mode !== 'online';
+  const showOnlineCta = event.mode !== 'presentiel';
 
   return (
-    <ThemeWrapper template={data.template}>
-      <main className="container mx-auto px-4 py-10">
-        {data.cover_image_url && (
-          <div className="mb-8 overflow-hidden rounded-lg">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={data.cover_image_url} alt="" className="h-64 w-full object-cover sm:h-96" />
-          </div>
-        )}
+    <ThemeInjector design={config.design}>
+      <div id="top" className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+        <Navbar
+          eventName={name}
+          logoUrl={event.logo_url}
+          isLive={config.is_live}
+          anchors={anchors}
+        />
 
-        <header className="mb-10 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{data.mode}</Badge>
-            <Badge variant="outline">{data.status}</Badge>
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{data.name}</h1>
-          <p className="text-lg text-muted-foreground">{formatEventDate(data.date)}</p>
-          {(data.location || data.venue_city) && (
-            <p className="text-muted-foreground">
-              {[data.location, data.venue_city].filter(Boolean).join(' — ')}
+        {/* ── Hero (photo + overlay, remplacé par le hero du template au Lot 2) ── */}
+        <section className="relative flex min-h-[72vh] items-end">
+          <Image
+            src={content.hero_image_url}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="container relative mx-auto px-4 pb-16 pt-36 text-white">
+            <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+              {name}
+            </h1>
+            <p className="mt-4 text-lg opacity-90">
+              {formatLongDate(event.date, locale)} — {event.start_time}
+              {(event.location || event.city) && (
+                <> · {[event.location, event.city].filter(Boolean).join(', ')}</>
+              )}
             </p>
-          )}
-        </header>
+            <div className="mt-8 flex flex-wrap gap-4">
+              {showPresentielCta && (
+                <a
+                  href="#tarifs"
+                  className="rounded-md bg-[var(--color-primary)] px-6 py-3 font-semibold text-white transition hover:opacity-90"
+                >
+                  {l(content.cta_presentiel, locale)}
+                </a>
+              )}
+              {showOnlineCta && (
+                <a
+                  href="#tarifs"
+                  className="rounded-md border border-white/70 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
+                >
+                  {l(content.cta_online, locale)}
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
 
-        {data.description && (
-          <section className="prose mb-10 max-w-none whitespace-pre-line text-base leading-relaxed">
-            {data.description}
+        {options.show_countdown && <CountdownBanner targetIso={targetIso} />}
+
+        {/* ── À propos ── */}
+        <section id="apropos" className="container mx-auto scroll-mt-20 px-4 py-16 sm:py-20">
+          <ScrollReveal>
+            <SectionTitle>{t('aboutTitle')}</SectionTitle>
+            <div
+              className="max-w-3xl space-y-4 text-base leading-relaxed opacity-90 [&_a]:underline"
+              // HTML restreint, sanitisé côté backend (éditeur rich text admin)
+              dangerouslySetInnerHTML={{ __html: l(content.description, locale) }}
+            />
+          </ScrollReveal>
+        </section>
+
+        {/* ── Formules ── */}
+        <section id="tarifs" className="container mx-auto scroll-mt-20 px-4 py-16 sm:py-20">
+          <ScrollReveal>
+            <SectionTitle>{t('pricingTitle')}</SectionTitle>
+          </ScrollReveal>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...formulas]
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((formula, i) => (
+                <ScrollReveal key={formula.id} delayMs={i * 100}>
+                  <FormulaCardLite
+                    formula={formula}
+                    locale={locale}
+                    slug={event.slug}
+                    showCounter={options.show_tickets_counter}
+                  />
+                </ScrollReveal>
+              ))}
+          </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section id="faq" className="container mx-auto max-w-3xl scroll-mt-20 px-4 py-16 sm:py-20">
+          <ScrollReveal>
+            <SectionTitle>{t('faqTitle')}</SectionTitle>
+            <div>
+              {faqs.map((faq) => (
+                <details key={faq.id} className="group border-b py-4" style={SOFT_BORDER}>
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium [&::-webkit-details-marker]:hidden">
+                    {l(faq.question, locale)}
+                    <span
+                      aria-hidden
+                      className="text-xl text-[var(--color-primary)] transition-transform group-open:rotate-45"
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="pt-3 text-sm leading-relaxed opacity-80">{l(faq.answer, locale)}</p>
+                </details>
+              ))}
+            </div>
+          </ScrollReveal>
+        </section>
+
+        {/* ── Partenaires ── */}
+        {partners.length > 0 && (
+          <section id="partenaires" className="container mx-auto px-4 pb-20">
+            <ScrollReveal>
+              <SectionTitle>{t('partnersTitle')}</SectionTitle>
+              <div className="flex flex-wrap items-center gap-x-10 gap-y-6">
+                {[...partners]
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .map((p) => {
+                    const logo = (
+                      <Image
+                        src={p.logo_url}
+                        alt={p.name}
+                        width={160}
+                        height={80}
+                        className="h-12 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"
+                      />
+                    );
+                    return p.url ? (
+                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" aria-label={p.name}>
+                        {logo}
+                      </a>
+                    ) : (
+                      <span key={p.id}>{logo}</span>
+                    );
+                  })}
+              </div>
+            </ScrollReveal>
           </section>
         )}
 
-        <section className="space-y-4">
-          <h2 className="text-2xl font-semibold">{t('formulasTitle')}</h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {data.formulas.map((f) => (
-              <FormulaCard key={f.id} formula={f} eventSlug={data.slug} />
-            ))}
-          </div>
-          {data.formulas.length === 0 && (
-            <p className="text-muted-foreground">{t('noFormulas')}</p>
-          )}
-        </section>
-      </main>
-      <ChatbotWidget eventSlug={data.slug} />
-    </ThemeWrapper>
+        <Footer config={config} locale={locale} anchors={anchors} />
+
+        {options.chatbot_enabled && (
+          <ChatbotWidget
+            eventSlug={event.slug}
+            whatsappNumber={config.support.whatsapp_number}
+            supportName={config.support.service_name}
+            faqs={faqs.map((f) => ({
+              id: f.id,
+              question: l(f.question, locale),
+              answer: l(f.answer, locale),
+            }))}
+          />
+        )}
+      </div>
+    </ThemeInjector>
   );
 }
 
-function FormulaCard({ formula, eventSlug }: { formula: FormulaPublic; eventSlug: string }) {
-  const t = useTranslations('event');
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="mb-8 text-3xl font-bold tracking-tight sm:text-4xl">{children}</h2>;
+}
+
+function FormulaCardLite({
+  formula,
+  locale,
+  slug,
+  showCounter,
+}: {
+  formula: FormulaConfig;
+  locale: Locale;
+  slug: string;
+  showCounter: boolean;
+}) {
+  const t = useTranslations('landing');
   return (
-    <Card className="flex flex-col">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>{formula.name}</CardTitle>
-          <Badge variant={formula.channel === 'online' ? 'default' : 'secondary'}>
-            {formula.channel}
-          </Badge>
-        </div>
-        <CardDescription>{formula.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col space-y-4">
-        <div className="text-3xl font-bold">{formatFCFA(formula.price)}</div>
-        {formula.advantages && (
-          <p className="whitespace-pre-line text-sm text-muted-foreground">{formula.advantages}</p>
+    <div
+      className={cn(
+        'relative flex h-full flex-col rounded-2xl border p-6',
+        formula.is_featured && 'border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]',
+      )}
+      style={formula.is_featured ? undefined : SOFT_BORDER}
+    >
+      {formula.is_featured && (
+        <span className="absolute -top-3 left-6 rounded-full bg-[var(--color-primary)] px-3 py-0.5 text-xs font-bold text-white">
+          {t('popular')}
+        </span>
+      )}
+      <h3 className="text-lg font-bold">{l(formula.name, locale)}</h3>
+      <p className="mt-1 text-sm opacity-70">{l(formula.description, locale)}</p>
+      <div className="mt-4 text-3xl font-bold">{formatFCFA(formula.price)}</div>
+      {showCounter && <TicketsCounter remaining={formula.remaining} className="mt-1" />}
+      <ul className="mt-4 space-y-2 text-sm">
+        {formula.advantages.map((advantage, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden className="text-[var(--color-primary)]">
+              •
+            </span>
+            <span className="opacity-90">{l(advantage, locale)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-auto pt-6">
+        {formula.is_sold_out ? (
+          <div
+            className="cursor-not-allowed rounded-md border py-2.5 text-center font-semibold opacity-50"
+            style={SOFT_BORDER}
+          >
+            {t('soldOut')}
+          </div>
+        ) : (
+          <Link
+            href={`/e/${slug}/acheter?formula=${formula.id}`}
+            className="block rounded-md bg-[var(--color-primary)] py-2.5 text-center font-semibold text-white transition hover:opacity-90"
+          >
+            {t('choose')}
+          </Link>
         )}
-        <div className="mt-auto">
-          {formula.is_sold_out ? (
-            <Button className="w-full" disabled>
-              {t('soldOut')}
-            </Button>
-          ) : (
-            <Link href={`/e/${eventSlug}/acheter?formula=${formula.id}`}>
-              <Button className="w-full">{t('choose')}</Button>
-            </Link>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
