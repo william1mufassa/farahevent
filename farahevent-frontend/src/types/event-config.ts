@@ -55,6 +55,8 @@ export interface EventContent {
   hero_video_url: string | null;
   /** Rich text — HTML restreint (p, strong, em, a, ul, ol, li). */
   description: Bilingual;
+  /** Phrase d'accroche courte (template B pull-quote, etc.). null si non renseignée. */
+  tagline: Bilingual | null;
   teaser_video_url: string | null;
   cta_presentiel: Bilingual;
   cta_online: Bilingual;

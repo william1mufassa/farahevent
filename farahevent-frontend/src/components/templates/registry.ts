@@ -2,11 +2,6 @@ import dynamic from 'next/dynamic';
 import type { TemplateKey } from '@/types/event-config';
 import type { TemplateSections } from './types';
 
-/**
- * Registry des templates : imports dynamiques par section pour que le
- * visiteur ne télécharge que le bundle du template actif.
- * A = KEYNOTE, B = SPOTLIGHT (Lot 4), C = DIRECTOR'S CUT, D = PULSE (Lot 9).
- */
 const keynote: TemplateSections = {
   Hero: dynamic(() => import('./keynote/Hero').then((m) => m.KeynoteHero)),
   About: dynamic(() => import('./keynote/About').then((m) => m.KeynoteAbout)),
@@ -18,11 +13,22 @@ const keynote: TemplateSections = {
   Partners: dynamic(() => import('./keynote/Partners').then((m) => m.KeynotePartners)),
 };
 
+const spotlight: TemplateSections = {
+  Hero: dynamic(() => import('./spotlight/Hero').then((m) => m.SpotlightHero)),
+  About: dynamic(() => import('./spotlight/About').then((m) => m.SpotlightAbout)),
+  Speakers: dynamic(() => import('./spotlight/Speakers').then((m) => m.SpotlightSpeakers)),
+  Programme: dynamic(() => import('./spotlight/Programme').then((m) => m.SpotlightProgramme)),
+  Formulas: dynamic(() => import('./spotlight/Formulas').then((m) => m.SpotlightFormulas)),
+  Stats: dynamic(() => import('./spotlight/Stats').then((m) => m.SpotlightStats)),
+  Faq: dynamic(() => import('./spotlight/Faq').then((m) => m.SpotlightFaq)),
+  Partners: dynamic(() => import('./spotlight/Partners').then((m) => m.SpotlightPartners)),
+};
+
 export const TEMPLATE_BY_KEY: Record<TemplateKey, TemplateSections> = {
   A: keynote,
-  B: keynote, // TODO Lot 4 — SPOTLIGHT
-  C: keynote, // TODO Lot 9 — DIRECTOR'S CUT
-  D: keynote, // TODO Lot 9 — PULSE
+  B: spotlight,
+  C: keynote, // TODO — DIRECTOR'S CUT
+  D: keynote, // TODO — PULSE
 };
 
 export function getTemplate(key: TemplateKey): TemplateSections {

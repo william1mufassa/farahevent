@@ -35,6 +35,10 @@ export const MOCK_EVENT_CONFIG: EventConfig = {
       fr: '<p>Le Forum Horizons Tech réunit à Abidjan les décideurs, entrepreneurs et talents qui construisent le numérique ouest-africain. Une journée de keynotes, panels et rencontres pour transformer les idées en opportunités concrètes.</p><p>En présentiel au Sofitel Hôtel Ivoire ou en direct depuis chez vous : choisissez votre façon de participer.</p>',
       en: '<p>The Horizons Tech Forum brings together in Abidjan the decision-makers, entrepreneurs and talents building West African tech. A full day of keynotes, panels and networking to turn ideas into concrete opportunities.</p><p>On-site at the Sofitel Hôtel Ivoire or live from home: choose how you attend.</p>',
     },
+    tagline: {
+      fr: "Là où les idées rencontrent l'action.",
+      en: 'Where ideas meet action.',
+    },
     teaser_video_url: null,
     cta_presentiel: { fr: 'Participer en présentiel', en: 'Attend in person' },
     cta_online: { fr: 'Suivre en ligne', en: 'Watch online' },
