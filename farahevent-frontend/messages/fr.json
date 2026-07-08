@@ -17,7 +17,27 @@
     "close": "Fermer le menu"
   },
   "live": {
-    "badge": "En direct"
+    "badge": "En direct",
+    "viewers": "{count, plural, one {# spectateur} other {# spectateurs}}",
+    "ccOff": "CC",
+    "ccToggle": "Sous-titres",
+    "invalidTitle": "Accès au direct impossible",
+    "invalidBody": "Ce lien est invalide ou a expiré. Vérifiez le lien reçu par email, ou contactez le support.",
+    "waitingTitle": "Le direct va bientôt commencer",
+    "waitingBody": "Gardez cette page ouverte : la diffusion démarrera automatiquement.",
+    "autoRefresh": "Cette page se met à jour toute seule.",
+    "refresh": "Actualiser",
+    "ejectedTitle": "Session ouverte sur un autre appareil",
+    "ejectedBody": "Votre accès est limité à un seul écran à la fois. La lecture a été interrompue ici.",
+    "watchHere": "Regarder ici",
+    "endedTitle": "Le direct est terminé",
+    "endedBody": "Merci d'avoir suivi l'événement. Un replay sera peut-être disponible.",
+    "watchReplay": "Voir le replay",
+    "contactSupport": "Contacter {service}",
+    "waPrefill": "Bonjour, je rencontre un problème d'accès au direct.",
+    "backHome": "Retour à l'accueil",
+    "connectionLost": "Connexion perdue — reconnexion…",
+    "reconnected": "Connexion rétablie"
   },
   "countdown": {
     "label": "L'événement commence dans",

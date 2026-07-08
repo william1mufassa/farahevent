@@ -17,7 +17,27 @@
     "close": "Close menu"
   },
   "live": {
-    "badge": "Live"
+    "badge": "Live",
+    "viewers": "{count, plural, one {# viewer} other {# viewers}}",
+    "ccOff": "CC",
+    "ccToggle": "Subtitles",
+    "invalidTitle": "Can't access the live stream",
+    "invalidBody": "This link is invalid or has expired. Check the link you received by email, or contact support.",
+    "waitingTitle": "The live stream is about to start",
+    "waitingBody": "Keep this page open: the broadcast will start automatically.",
+    "autoRefresh": "This page updates on its own.",
+    "refresh": "Refresh",
+    "ejectedTitle": "Session opened on another device",
+    "ejectedBody": "Your access is limited to one screen at a time. Playback was stopped here.",
+    "watchHere": "Watch here",
+    "endedTitle": "The live stream has ended",
+    "endedBody": "Thanks for watching. A replay may be available.",
+    "watchReplay": "Watch the replay",
+    "contactSupport": "Contact {service}",
+    "waPrefill": "Hello, I'm having trouble accessing the live stream.",
+    "backHome": "Back to home",
+    "connectionLost": "Connection lost — reconnecting…",
+    "reconnected": "Connection restored"
   },
   "countdown": {
     "label": "The event starts in",
