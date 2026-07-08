@@ -1,130 +1,133 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, CreditCard, QrCode, Users } from 'lucide-react';
+import { Radio, QrCode, Ticket, Wallet, Clock } from 'lucide-react';
 
-import { adminApi } from '@/lib/admin-api';
+import { getDashboardStats } from '@/lib/api/admin/stats';
+import { useAdminUi } from '@/stores/useAdminUi';
 import { useAuth } from '@/contexts/auth';
-import type { EventAdmin, ManualPaymentAdmin } from '@/types/admin';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
+import { cn, formatFCFA } from '@/lib/utils';
+import type { StatsPeriod } from '@/types/admin-stats';
+import { Skeleton } from '@/components/ui/skeleton';
+import { KpiCard } from '@/components/admin/dashboard/KpiCard';
+import { RevenueChart } from '@/components/admin/dashboard/RevenueChart';
+import { SalesChart } from '@/components/admin/dashboard/SalesChart';
+import { CountryChart } from '@/components/admin/dashboard/CountryChart';
+import { ActivityFeed } from '@/components/admin/dashboard/ActivityFeed';
+
+const PERIODS: Array<{ value: StatsPeriod; label: string }> = [
+  { value: '7d', label: '7 jours' },
+  { value: '30d', label: '30 jours' },
+  { value: 'all', label: 'Tout' },
+];
 
 export default function AdminDashboardPage() {
   const { admin } = useAuth();
+  const selectedEventId = useAdminUi((s) => s.selectedEventId);
+  const [period, setPeriod] = useState<StatsPeriod>('30d');
 
-  const { data: events } = useQuery({
-    queryKey: ['admin', 'events'],
-    queryFn: async () => (await adminApi.get<EventAdmin[]>('/admin/events/')).data,
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['admin', 'stats', selectedEventId, period],
+    queryFn: () => getDashboardStats(selectedEventId, period),
   });
 
-  const { data: payments } = useQuery({
-    queryKey: ['admin', 'manual-payments'],
-    queryFn: async () =>
-      (await adminApi.get<ManualPaymentAdmin[]>('/admin/manual-payments/?status=pending')).data,
-    enabled: admin?.role !== 'agent',
-  });
-
-  const pending = payments?.length ?? 0;
-  const activeEvents = events?.filter((e) => e.status === 'open' || e.status === 'live').length ?? 0;
-  const totalEvents = events?.length ?? 0;
+  const n = (v: number) => v.toLocaleString('fr-FR');
+  const k = stats?.kpis;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Tableau de bord</h1>
-        <p className="text-muted-foreground">
-          Bienvenue, {admin?.first_name}. Voici un apercu de votre activite.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Tableau de bord</h1>
+          <p className="text-sm text-muted-foreground">
+            Bienvenue, {admin?.first_name}. Aperçu de votre activité.
+          </p>
+        </div>
+        <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+          {PERIODS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setPeriod(p.value)}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                period === p.value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/admin/events">
-          <Card className="hover:border-primary/40 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Evenements</CardTitle>
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalEvents}</div>
-              <p className="text-xs text-muted-foreground">{activeEvents} actif(s)</p>
-            </CardContent>
-          </Card>
-        </Link>
+      {isLoading || !k ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          <div
+            className={cn(
+              'grid gap-4 sm:grid-cols-2',
+              k.live_viewers !== null ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4',
+            )}
+          >
+            <KpiCard icon={Ticket} label="Billets vendus" value={n(k.tickets_sold)} />
+            <KpiCard icon={QrCode} label="Entrées scannées" value={n(k.scans)} />
+            <KpiCard icon={Wallet} label="Revenus" value={formatFCFA(k.revenue)} />
+            <KpiCard
+              icon={Clock}
+              label="Manuels en attente"
+              value={n(k.pending_manual)}
+              sub={k.pending_manual > 0 ? 'à traiter' : 'rien à traiter'}
+              accent={k.pending_manual > 0 ? 'warning' : undefined}
+            />
+            {k.live_viewers !== null && (
+              <KpiCard
+                icon={Radio}
+                label="Spectateurs live"
+                value={n(k.live_viewers)}
+                sub="en direct"
+                accent="live"
+              />
+            )}
+          </div>
 
-        <Link href="/admin/manual-payments">
-          <Card className="hover:border-primary/40 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Paiements en attente</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pending}</div>
-              <p className="text-xs text-muted-foreground">A valider / rejeter</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/admin/scan">
-          <Card className="hover:border-primary/40 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Scanner QR</CardTitle>
-              <QrCode className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Scan</div>
-              <p className="text-xs text-muted-foreground">Controle des entrees</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        {admin?.role === 'super_admin' && (
-          <Link href="/admin/admins">
-            <Card className="hover:border-primary/40 transition-colors cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Collaborateurs</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Gerer</div>
-                <p className="text-xs text-muted-foreground">Comptes admin</p>
-              </CardContent>
-            </Card>
-          </Link>
-        )}
-      </div>
-
-      {payments && payments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Derniers paiements en attente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {payments.slice(0, 5).map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-md border p-3 text-sm"
-                >
-                  <div>
-                    <span className="font-medium">
-                      {p.participant.first_name} {p.participant.last_name}
-                    </span>
-                    <span className="mx-2 text-muted-foreground">-</span>
-                    <span>{p.event.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono">
-                      {p.order.amount.toLocaleString()} {p.order.currency}
-                    </span>
-                    <Badge variant="outline">{p.operator.replace('_', ' ')}</Badge>
-                  </div>
-                </div>
-              ))}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <RevenueChart data={stats.revenue_series} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SalesChart data={stats.sales_by_formula} />
+                <CountryChart data={stats.sales_by_country} />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <ActivityFeed items={stats.activity} />
+          </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Skeleton className="h-72 rounded-xl" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-64 rounded-xl" />
+            <Skeleton className="h-64 rounded-xl" />
+          </div>
+        </div>
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
     </div>
   );
 }

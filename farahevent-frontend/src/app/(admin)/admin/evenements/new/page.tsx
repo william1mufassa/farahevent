@@ -53,7 +53,7 @@ export default function NewEventPage() {
     },
     onSuccess: (evt) => {
       toast.success('Evenement cree.');
-      router.push(`/admin/events/${evt.id}`);
+      router.push(`/admin/evenements/${evt.id}`);
     },
     onError: (e) => toast.error(toApiError(e).message),
   });

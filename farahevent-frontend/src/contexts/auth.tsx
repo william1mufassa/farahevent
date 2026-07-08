@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AdminInfo } from '@/types/admin';
+import type { AdminInfo, AdminRole } from '@/types/admin';
+import { mockAdmin } from '@/mocks/admin.fixture';
 
 interface AuthCtx {
   admin: AdminInfo | null;
@@ -24,6 +25,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Dev sans backend : admin fictif ; ?role= pour prévisualiser les 4 rôles.
+    if (process.env.NEXT_PUBLIC_USE_MOCK === '1') {
+      const roles: AdminRole[] = ['super_admin', 'manager', 'agent', 'comptable'];
+      const param = new URLSearchParams(window.location.search).get('role');
+      const stored = localStorage.getItem('fe_admin');
+      if (roles.includes(param as AdminRole)) {
+        setAdmin(mockAdmin(param as AdminRole));
+      } else if (stored) {
+        try {
+          setAdmin(JSON.parse(stored));
+        } catch {
+          setAdmin(mockAdmin('super_admin'));
+        }
+      } else {
+        setAdmin(mockAdmin('super_admin'));
+      }
+      setIsLoading(false);
+      return;
+    }
+
     const stored = localStorage.getItem('fe_admin');
     const token = localStorage.getItem('fe_access_token');
     if (stored && token) {

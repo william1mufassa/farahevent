@@ -44,6 +44,33 @@
     /* --font-sans / --font-serif / --font-display : fournies par next/font
        (lib/fonts.ts) via la classe appliquée sur <html>. */
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Dark admin (CONCEPTION_FRONTEND.md §6.2). Appliqué par la classe `dark`
+     posée sur le conteneur du shell admin (piloté par le store useAdminUi).
+     Base #0F1117, surfaces #1A1D26. N'affecte jamais le public.
+     ══════════════════════════════════════════════════════════════════════ */
+  .dark {
+    --background: 222 24% 8%;
+    --foreground: 210 40% 96%;
+    --card: 222 20% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 20% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 210 40% 96%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 16% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 222 16% 16%;
+    --muted-foreground: 217 15% 65%;
+    --accent: 222 16% 18%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 62% 46%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 16% 20%;
+    --input: 222 16% 20%;
+    --ring: 213 80% 60%;
+  }
 }
 
 @layer base {

@@ -18,6 +18,13 @@ const nextConfig = {
       { source: '/paiement/attente', destination: '/en-attente', permanent: true },
       { source: '/paiement/echec', destination: '/echec', permanent: true },
       { source: '/mon-billet', destination: '/billet', permanent: true },
+      // Renommage des routes admin en français (Lot 6).
+      { source: '/admin/events', destination: '/admin/evenements', permanent: true },
+      { source: '/admin/events/:path*', destination: '/admin/evenements/:path*', permanent: true },
+      { source: '/admin/manual-payments', destination: '/admin/paiements', permanent: true },
+      { source: '/admin/manual-payments/:path*', destination: '/admin/paiements/:path*', permanent: true },
+      { source: '/admin/admins', destination: '/admin/equipe', permanent: true },
+      { source: '/admin/audit-logs', destination: '/admin/activite', permanent: true },
     ];
   },
   async rewrites() {

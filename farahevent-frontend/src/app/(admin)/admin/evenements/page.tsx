@@ -48,7 +48,7 @@ export default function EventsListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Evenements</h1>
-        <Link href="/admin/events/new">
+        <Link href="/admin/evenements/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" /> Creer
           </Button>
@@ -86,7 +86,7 @@ export default function EventsListPage() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Link href={`/admin/events/${evt.id}`}>
+                  <Link href={`/admin/evenements/${evt.id}`}>
                     <Button variant="ghost" size="sm">
                       <Pencil className="h-4 w-4" />
                     </Button>

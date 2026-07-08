@@ -54,7 +54,7 @@ export default function EventDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/events">
+        <Link href="/admin/evenements">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" /> Retour
           </Button>
