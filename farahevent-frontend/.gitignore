@@ -19,3 +19,6 @@ pnpm-debug.log*
 .idea/
 
 next-env.d.ts
+
+# Artefact de compilation TypeScript incrémentale
+tsconfig.tsbuildinfo
