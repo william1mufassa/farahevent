@@ -30,4 +30,14 @@ export const MOCK_EVENT_DRAFT: EventDraft = {
     template: MOCK_EVENT_CONFIG.design.template,
     colors: MOCK_EVENT_CONFIG.design.colors,
   },
+  speakers: MOCK_EVENT_CONFIG.speakers,
+  programme: MOCK_EVENT_CONFIG.programme,
+  partners: MOCK_EVENT_CONFIG.partners,
+  options: MOCK_EVENT_CONFIG.options,
+  automations: [
+    { id: 'auto_1', label: 'Rappel J-7', channel: 'email', offset_days: -7, enabled: true },
+    { id: 'auto_2', label: 'Rappel J-1', channel: 'both', offset_days: -1, enabled: true },
+    { id: 'auto_3', label: 'Lien du direct J-0', channel: 'whatsapp', offset_days: 0, enabled: true },
+    { id: 'auto_4', label: 'Remerciement + replay J+1', channel: 'email', offset_days: 1, enabled: false },
+  ],
 };

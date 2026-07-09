@@ -2,14 +2,18 @@ import type {
   Bilingual,
   EventColors,
   EventMode,
+  EventOptions,
   EventStatus,
+  Partner,
+  ProgrammeItem,
+  Speaker,
   TemplateKey,
 } from '@/types/event-config';
 
 /**
  * Brouillon éditable d'un événement (admin CMS, CONCEPTION_FRONTEND.md §10.3).
- * Représentation structurée des sections éditées par les onglets phares du
- * Lot 7 (Général, Contenu, Design). Chaque section a son PATCH isolé.
+ * Miroir structuré des sections éditables de la landing (contrat EventConfig) —
+ * la « réconciliation » EventDraft ↔ EventConfig. Chaque section a son PATCH.
  */
 export interface EventDraftGeneral {
   name: Bilingual;
@@ -40,11 +44,34 @@ export interface EventDraftDesign {
   colors: EventColors;
 }
 
+/** Déclencheur d'automation (J-7…J+7) — hors contrat public EventConfig. */
+export interface AutomationRule {
+  id: string;
+  label: string;
+  channel: 'email' | 'whatsapp' | 'both';
+  /** Décalage en jours vs l'événement : négatif = avant, positif = après. */
+  offset_days: number;
+  enabled: boolean;
+}
+
 export interface EventDraft {
   id: string;
   general: EventDraftGeneral;
   content: EventDraftContent;
   design: EventDraftDesign;
+  speakers: Speaker[];
+  programme: ProgrammeItem[];
+  partners: Partner[];
+  options: EventOptions;
+  automations: AutomationRule[];
 }
 
-export type DraftSection = 'general' | 'content' | 'design';
+export type DraftSection =
+  | 'general'
+  | 'content'
+  | 'design'
+  | 'speakers'
+  | 'programme'
+  | 'partners'
+  | 'options'
+  | 'automations';

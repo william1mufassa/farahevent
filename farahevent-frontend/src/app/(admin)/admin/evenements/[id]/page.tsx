@@ -16,13 +16,26 @@ import { useUnsavedWarning } from '@/components/admin/event-config/useUnsavedWar
 import { GeneralTab } from '@/components/admin/event-config/tabs/GeneralTab';
 import { ContentTab } from '@/components/admin/event-config/tabs/ContentTab';
 import { DesignTab } from '@/components/admin/event-config/tabs/DesignTab';
-import { PlaceholderTab } from '@/components/admin/event-config/tabs/PlaceholderTab';
+import { SpeakersTab } from '@/components/admin/event-config/tabs/SpeakersTab';
+import { ProgrammeTab } from '@/components/admin/event-config/tabs/ProgrammeTab';
+import { PartnersTab } from '@/components/admin/event-config/tabs/PartnersTab';
+import { OptionsTab } from '@/components/admin/event-config/tabs/OptionsTab';
+import { AutomationsTab } from '@/components/admin/event-config/tabs/AutomationsTab';
 import { FormulasTab } from '@/components/admin/event-config/tabs/legacy/FormulasTab';
 import { FaqsTab } from '@/components/admin/event-config/tabs/legacy/FaqsTab';
 import { WhatsappGroupsTab } from '@/components/admin/event-config/tabs/legacy/WhatsappGroupsTab';
 import { PaymentTab } from '@/components/admin/event-config/tabs/legacy/PaymentTab';
 
-const CORE_SECTIONS: DraftSection[] = ['general', 'content', 'design'];
+const CORE_SECTIONS: DraftSection[] = [
+  'general',
+  'content',
+  'design',
+  'speakers',
+  'programme',
+  'partners',
+  'options',
+  'automations',
+];
 
 export default function EventConfigPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,15 +79,15 @@ export default function EventConfigPage() {
     { key: 'general', label: 'Général', dirty: isDirty('general') },
     { key: 'formules', label: 'Formules' },
     { key: 'contenu', label: 'Contenu', dirty: isDirty('content') },
-    { key: 'speakers', label: 'Speakers' },
-    { key: 'programme', label: 'Programme' },
-    { key: 'partenaires', label: 'Partenaires' },
+    { key: 'speakers', label: 'Speakers', dirty: isDirty('speakers') },
+    { key: 'programme', label: 'Programme', dirty: isDirty('programme') },
+    { key: 'partenaires', label: 'Partenaires', dirty: isDirty('partners') },
     { key: 'chatbot', label: 'Chatbot' },
     { key: 'whatsapp', label: 'Groupes WhatsApp' },
     { key: 'design', label: 'Design', dirty: isDirty('design') },
     { key: 'paiement', label: 'Paiement' },
-    { key: 'automations', label: 'Automations' },
-    { key: 'options', label: 'Options' },
+    { key: 'automations', label: 'Automations', dirty: isDirty('automations') },
+    { key: 'options', label: 'Options', dirty: isDirty('options') },
   ];
 
   if (!draft) return <p className="text-sm text-muted-foreground">Chargement…</p>;
@@ -135,11 +148,52 @@ export default function EventConfigPage() {
         {active === 'whatsapp' && <WhatsappGroupsTab eventId={id} />}
         {active === 'paiement' && <PaymentTab eventId={id} />}
 
-        {active === 'speakers' && <PlaceholderTab title="Speakers" />}
-        {active === 'programme' && <PlaceholderTab title="Programme" />}
-        {active === 'partenaires' && <PlaceholderTab title="Partenaires" />}
-        {active === 'automations' && <PlaceholderTab title="Automations" />}
-        {active === 'options' && <PlaceholderTab title="Options" />}
+        {active === 'speakers' && (
+          <SpeakersTab
+            value={draft.speakers}
+            onChange={(v) => setDraft({ ...draft, speakers: v })}
+            dirty={isDirty('speakers')}
+            saving={savingSection === 'speakers'}
+            onSave={() => saveSection('speakers')}
+          />
+        )}
+        {active === 'programme' && (
+          <ProgrammeTab
+            value={draft.programme}
+            speakers={draft.speakers}
+            onChange={(v) => setDraft({ ...draft, programme: v })}
+            dirty={isDirty('programme')}
+            saving={savingSection === 'programme'}
+            onSave={() => saveSection('programme')}
+          />
+        )}
+        {active === 'partenaires' && (
+          <PartnersTab
+            value={draft.partners}
+            onChange={(v) => setDraft({ ...draft, partners: v })}
+            dirty={isDirty('partners')}
+            saving={savingSection === 'partners'}
+            onSave={() => saveSection('partners')}
+          />
+        )}
+        {active === 'automations' && (
+          <AutomationsTab
+            value={draft.automations}
+            onChange={(v) => setDraft({ ...draft, automations: v })}
+            dirty={isDirty('automations')}
+            saving={savingSection === 'automations'}
+            onSave={() => saveSection('automations')}
+          />
+        )}
+        {active === 'options' && (
+          <OptionsTab
+            value={draft.options}
+            onChange={(v) => setDraft({ ...draft, options: v })}
+            dirty={isDirty('options')}
+            saving={savingSection === 'options'}
+            onSave={() => saveSection('options')}
+          />
+        )}
       </div>
     </div>
   );

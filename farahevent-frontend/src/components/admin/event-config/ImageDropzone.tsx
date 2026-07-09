@@ -12,9 +12,12 @@ import { cn } from '@/lib/utils';
 export function ImageDropzone({
   value,
   onChange,
+  aspect = 'aspect-[16/7]',
 }: {
   value: string;
   onChange: (url: string) => void;
+  /** Classe Tailwind de ratio (ex. 'aspect-[3/4]' pour un portrait). */
+  aspect?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
