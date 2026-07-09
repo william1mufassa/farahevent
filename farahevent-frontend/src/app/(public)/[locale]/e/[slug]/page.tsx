@@ -7,7 +7,9 @@ import type { Locale } from '@/lib/i18n/routing';
 
 import { getTemplate } from '@/components/templates/registry';
 import { SECTION_IDS } from '@/components/templates/types';
+import type { TemplateKey } from '@/types/event-config';
 import { ThemeInjector } from '@/components/shared/ThemeInjector';
+import { PreviewBridge } from '@/components/shared/PreviewBridge';
 import { Navbar, type NavAnchor } from '@/components/shared/Navbar';
 import { Footer } from '@/components/shared/Footer';
 import { CountdownBanner } from '@/components/shared/CountdownBanner';
@@ -44,12 +46,27 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-export default async function EventLandingPage({ params }: { params: Params }) {
+const TEMPLATE_KEYS: TemplateKey[] = ['A', 'B', 'C', 'D'];
+
+export default async function EventLandingPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: { preview?: string; template?: string };
+}) {
   const locale = params.locale as Locale;
   const config = await getEventConfig(params.slug);
   if (!config) notFound();
 
-  const T = getTemplate(config.design.template);
+  // Mode aperçu admin (§10.4) : le template peut être surchargé par l'URL.
+  const preview = searchParams?.preview === '1';
+  const templateKey =
+    preview && TEMPLATE_KEYS.includes(searchParams.template as TemplateKey)
+      ? (searchParams.template as TemplateKey)
+      : config.design.template;
+
+  const T = getTemplate(templateKey);
   const { event, options, speakers, programme, stats, faqs, partners } = config;
 
   const showSpeakers = options.show_speakers && speakers.length > 0;
@@ -64,6 +81,7 @@ export default async function EventLandingPage({ params }: { params: Params }) {
 
   return (
     <ThemeInjector design={config.design}>
+      {preview && <PreviewBridge />}
       <div id="top" className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
         <Navbar
           eventName={l(event.name, locale)}
