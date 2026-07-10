@@ -24,11 +24,33 @@ const spotlight: TemplateSections = {
   Partners: dynamic(() => import('./spotlight/Partners').then((m) => m.SpotlightPartners)),
 };
 
+const directorsCut: TemplateSections = {
+  Hero: dynamic(() => import('./directors-cut/Hero').then((m) => m.DirectorsCutHero)),
+  About: dynamic(() => import('./directors-cut/About').then((m) => m.DirectorsCutAbout)),
+  Speakers: dynamic(() => import('./directors-cut/Speakers').then((m) => m.DirectorsCutSpeakers)),
+  Programme: dynamic(() => import('./directors-cut/Programme').then((m) => m.DirectorsCutProgramme)),
+  Formulas: dynamic(() => import('./directors-cut/Formulas').then((m) => m.DirectorsCutFormulas)),
+  Stats: dynamic(() => import('./directors-cut/Stats').then((m) => m.DirectorsCutStats)),
+  Faq: dynamic(() => import('./directors-cut/Faq').then((m) => m.DirectorsCutFaq)),
+  Partners: dynamic(() => import('./directors-cut/Partners').then((m) => m.DirectorsCutPartners)),
+};
+
+const pulse: TemplateSections = {
+  Hero: dynamic(() => import('./pulse/Hero').then((m) => m.PulseHero)),
+  About: dynamic(() => import('./pulse/About').then((m) => m.PulseAbout)),
+  Speakers: dynamic(() => import('./pulse/Speakers').then((m) => m.PulseSpeakers)),
+  Programme: dynamic(() => import('./pulse/Programme').then((m) => m.PulseProgramme)),
+  Formulas: dynamic(() => import('./pulse/Formulas').then((m) => m.PulseFormulas)),
+  Stats: dynamic(() => import('./pulse/Stats').then((m) => m.PulseStats)),
+  Faq: dynamic(() => import('./pulse/Faq').then((m) => m.PulseFaq)),
+  Partners: dynamic(() => import('./pulse/Partners').then((m) => m.PulsePartners)),
+};
+
 export const TEMPLATE_BY_KEY: Record<TemplateKey, TemplateSections> = {
   A: keynote,
   B: spotlight,
-  C: keynote, // TODO — DIRECTOR'S CUT
-  D: keynote, // TODO — PULSE
+  C: directorsCut,
+  D: pulse,
 };
 
 export function getTemplate(key: TemplateKey): TemplateSections {
