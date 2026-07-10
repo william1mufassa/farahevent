@@ -1,167 +1,166 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
-import { adminApi } from '@/lib/admin-api';
 import { toApiError } from '@/lib/api';
-import type { AdminOut } from '@/types/admin';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { createAdmin, deactivateAdmin, getAdmins, type NewAdmin } from '@/lib/api/admin/team';
+import { cn } from '@/lib/utils';
+import { FIELD, LBL } from '@/components/admin/event-config/fieldStyles';
 
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-purple-100 text-purple-800',
-  manager: 'bg-blue-100 text-blue-800',
-  agent: 'bg-green-100 text-green-800',
-  comptable: 'bg-amber-100 text-amber-800',
+const ROLE: Record<string, { label: string; cls: string }> = {
+  super_admin: { label: 'Super admin', cls: 'bg-purple-500/15 text-purple-600' },
+  manager: { label: 'Manager', cls: 'bg-blue-500/15 text-blue-600' },
+  comptable: { label: 'Comptable', cls: 'bg-amber-500/15 text-amber-600' },
+  agent: { label: 'Agent', cls: 'bg-emerald-500/15 text-emerald-600' },
 };
 
-export default function AdminsPage() {
+export default function TeamPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
-  const { data: admins, isLoading } = useQuery({
-    queryKey: ['admin', 'admins'],
-    queryFn: async () => (await adminApi.get<AdminOut[]>('/admin/admins/')).data,
+  const { data: admins, isLoading } = useQuery({ queryKey: ['admin', 'team'], queryFn: getAdmins });
+
+  const { register, handleSubmit, reset } = useForm<NewAdmin>({
+    defaultValues: { first_name: '', last_name: '', email: '', password: '', role: 'agent' },
   });
 
-  const { register, handleSubmit, reset } = useForm({
-    defaultValues: {
-      email: '',
-      password: '',
-      first_name: '',
-      last_name: '',
-      role: 'agent',
-    },
-  });
-
-  const createMut = useMutation({
-    mutationFn: async (form: Record<string, string>) => adminApi.post('/admin/admins/', form),
+  const create = useMutation({
+    mutationFn: (form: NewAdmin) => createAdmin(form),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin', 'admins'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'team'] });
       reset();
       setShowForm(false);
-      toast.success('Collaborateur cree.');
+      toast.success('Collaborateur créé.');
     },
     onError: (e) => toast.error(toApiError(e).message),
   });
 
-  const deactivateMut = useMutation({
-    mutationFn: async (id: string) => adminApi.delete(`/admin/admins/${id}`),
+  const deactivate = useMutation({
+    mutationFn: (id: string) => deactivateAdmin(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin', 'admins'] });
-      toast.success('Collaborateur desactive.');
+      qc.invalidateQueries({ queryKey: ['admin', 'team'] });
+      toast.success('Collaborateur désactivé.');
     },
     onError: (e) => toast.error(toApiError(e).message),
   });
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Collaborateurs</h1>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-2 h-4 w-4" /> {showForm ? 'Annuler' : 'Ajouter'}
-        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Équipe</h1>
+          <p className="text-sm text-muted-foreground">Gestion des comptes et des rôles.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowForm((s) => !s)}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+        >
+          <Plus className="h-4 w-4" />
+          {showForm ? 'Annuler' : 'Ajouter'}
+        </button>
       </div>
 
       {showForm && (
-        <Card>
-          <CardContent className="pt-4">
-            <form onSubmit={handleSubmit((d) => createMut.mutate(d))} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Prenom *</Label>
-                  <Input {...register('first_name', { required: true })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Nom *</Label>
-                  <Input {...register('last_name', { required: true })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Email *</Label>
-                  <Input type="email" {...register('email', { required: true })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Mot de passe *</Label>
-                  <Input type="password" {...register('password', { required: true, minLength: 8 })} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Role</Label>
-                <select
-                  {...register('role')}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                >
-                  <option value="agent">Agent</option>
-                  <option value="manager">Manager</option>
-                  <option value="comptable">Comptable</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-              </div>
-              <Button type="submit" size="sm" disabled={createMut.isPending}>
-                {createMut.isPending ? 'Creation...' : 'Creer'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <form
+          onSubmit={handleSubmit((d) => create.mutate(d))}
+          className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className={LBL}>Prénom</label>
+              <input className={FIELD} {...register('first_name', { required: true })} />
+            </div>
+            <div className="space-y-1">
+              <label className={LBL}>Nom</label>
+              <input className={FIELD} {...register('last_name', { required: true })} />
+            </div>
+            <div className="space-y-1">
+              <label className={LBL}>Email</label>
+              <input type="email" className={FIELD} {...register('email', { required: true })} />
+            </div>
+            <div className="space-y-1">
+              <label className={LBL}>Mot de passe</label>
+              <input type="password" className={FIELD} {...register('password', { required: true, minLength: 8 })} />
+            </div>
+            <div className="space-y-1">
+              <label className={LBL}>Rôle</label>
+              <select className={FIELD} {...register('role')}>
+                <option value="agent">Agent</option>
+                <option value="manager">Manager</option>
+                <option value="comptable">Comptable</option>
+                <option value="super_admin">Super admin</option>
+              </select>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={create.isPending}
+            className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+          >
+            {create.isPending ? 'Création…' : 'Créer le compte'}
+          </button>
+        </form>
       )}
 
       {isLoading ? (
-        <p className="text-muted-foreground">Chargement...</p>
-      ) : !admins?.length ? (
-        <p className="text-muted-foreground">Aucun collaborateur.</p>
+        <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : (
         <div className="space-y-2">
-          {admins.map((a) => (
-            <div
-              key={a.id}
-              className={`flex items-center justify-between rounded-md border p-3 text-sm ${
-                !a.is_active ? 'opacity-50' : ''
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div>
-                  <span className="font-medium">
-                    {a.first_name} {a.last_name}
-                  </span>
-                  <span className="ml-2 text-muted-foreground">{a.email}</span>
-                </div>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[a.role] ?? ''}`}
-                >
-                  {a.role}
-                </span>
-                {a.two_factor_enabled && (
-                  <Badge variant="outline" className="text-xs">
-                    2FA
-                  </Badge>
+          {admins?.map((a) => {
+            const role = ROLE[a.role] ?? { label: a.role, cls: 'bg-muted text-muted-foreground' };
+            return (
+              <div
+                key={a.id}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm',
+                  !a.is_active && 'opacity-60',
                 )}
-                {!a.is_active && (
-                  <Badge variant="destructive" className="text-xs">
-                    Inactif
-                  </Badge>
-                )}
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Desactiver ce collaborateur ?')) deactivateMut.mutate(a.id);
-                }}
-                disabled={!a.is_active}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {(a.first_name[0] ?? '') + (a.last_name[0] ?? '')}
+                  </span>
+                  <div>
+                    <p className="font-medium">
+                      {a.first_name} {a.last_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{a.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', role.cls)}>
+                    {role.label}
+                  </span>
+                  {a.two_factor_enabled && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      <ShieldCheck className="h-3 w-3" /> 2FA
+                    </span>
+                  )}
+                  {!a.is_active ? (
+                    <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-600">
+                      Inactif
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Désactiver ce collaborateur ?')) deactivate.mutate(a.id);
+                      }}
+                      aria-label="Désactiver"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
