@@ -1,46 +1,32 @@
 import axios from 'axios';
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+/**
+ * Client des appels admin. Les requêtes passent par le BFF same-origin
+ * (/api/proxy/*) qui porte la session en cookies httpOnly et ajoute le
+ * Bearer côté serveur — aucun jeton n'est accessible au JS client
+ * (audit §07). Le refresh silencieux est géré par le proxy.
+ */
+export const adminApi = axios.create({ baseURL: '/api/proxy', timeout: 20000 });
 
-export const adminApi = axios.create({ baseURL, timeout: 15000 });
-
+// Next normalise les URLs par un 308 sur le slash final : on le retire ici
+// pour éviter un aller-retour navigateur (FastAPI re-normalise côté serveur).
 adminApi.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('fe_access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
+  if (config.url) config.url = config.url.replace(/\/+(?=\?|$)/, '');
   return config;
 });
 
 adminApi.interceptors.response.use(
   (res) => res,
-  async (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      const refresh = localStorage.getItem('fe_refresh_token');
-      if (refresh && !error.config._retry) {
-        error.config._retry = true;
-        try {
-          const { data } = await axios.post(`${baseURL}/admin/auth/refresh`, {
-            refresh_token: refresh,
-          });
-          localStorage.setItem('fe_access_token', data.access_token);
-          localStorage.setItem('fe_refresh_token', data.refresh_token);
-          error.config.headers.Authorization = `Bearer ${data.access_token}`;
-          return adminApi(error.config);
-        } catch {
-          localStorage.removeItem('fe_access_token');
-          localStorage.removeItem('fe_refresh_token');
-          localStorage.removeItem('fe_admin');
-          window.location.href = '/admin/login';
-        }
-      } else {
-        localStorage.removeItem('fe_access_token');
-        localStorage.removeItem('fe_refresh_token');
-        localStorage.removeItem('fe_admin');
-        window.location.href = '/admin/login';
-      }
+  (error) => {
+    if (
+      error.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      process.env.NEXT_PUBLIC_USE_MOCK !== '1' &&
+      !window.location.pathname.startsWith('/admin/login')
+    ) {
+      // Session expirée / révoquée : retour au login (profil purgé).
+      localStorage.removeItem('fe_admin');
+      window.location.href = '/admin/login';
     }
     return Promise.reject(error);
   },

@@ -3,18 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import axios from 'axios';
 
 import { useAuth } from '@/contexts/auth';
-import type { LoginResponse } from '@/types/admin';
-import { toApiError } from '@/lib/api';
+import type { AdminInfo } from '@/types/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
+/**
+ * Connexion admin via le BFF (/api/admin-session/login) : les jetons sont
+ * posés en cookies httpOnly côté serveur, le client ne reçoit que le profil.
+ */
 export default function AdminLoginPage() {
   const { login } = useAuth();
   const router = useRouter();
@@ -32,21 +32,31 @@ export default function AdminLoginPage() {
       const payload: Record<string, string> = { email, password };
       if (needs2FA && otpCode) payload.otp_code = otpCode;
 
-      const { data } = await axios.post<LoginResponse>(
-        `${baseURL}/admin/auth/login`,
-        payload,
-      );
+      const res = await fetch('/api/admin-session/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-      login(data.access_token, data.refresh_token, data.admin);
-      toast.success(`Bienvenue, ${data.admin.first_name} !`);
-      router.replace('/admin');
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 202) {
+      if (res.status === 202) {
         setNeeds2FA(true);
         toast.info('Saisissez votre code 2FA.');
-      } else {
-        toast.error(toApiError(err).message);
+        return;
       }
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = typeof data.detail === 'string' ? data.detail : 'Connexion impossible.';
+        toast.error(detail);
+        return;
+      }
+
+      const admin = data.admin as AdminInfo;
+      login(admin);
+      toast.success(`Bienvenue, ${admin.first_name} !`);
+      router.replace('/admin');
+    } catch {
+      toast.error('Connexion impossible — réessayez.');
     } finally {
       setLoading(false);
     }

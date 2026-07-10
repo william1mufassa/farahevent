@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl';
 import { ScrollReveal } from '@/components/shared/ScrollReveal';
 import { l } from '@/lib/localized';
+import { sanitizeRichText } from '@/lib/sanitize';
 import type { TemplateSectionProps } from '../types';
 import { SECTION_IDS } from '../types';
 import { SectionHeader } from './SectionHeader';
@@ -25,7 +26,7 @@ export function SpotlightAbout({ config, locale }: TemplateSectionProps) {
         <ScrollReveal className={tagline ? 'lg:col-span-3' : 'lg:col-span-5 mx-auto max-w-3xl'}>
           <div
             className="space-y-4 text-base leading-relaxed opacity-85 [&_a]:text-[var(--color-primary)] [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: l(config.content.description, locale) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
           />
         </ScrollReveal>
       </div>

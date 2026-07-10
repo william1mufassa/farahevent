@@ -5,10 +5,16 @@ import { useRouter } from 'next/navigation';
 import type { AdminInfo, AdminRole } from '@/types/admin';
 import { mockAdmin } from '@/mocks/admin.fixture';
 
+/**
+ * Contexte auth admin. Les jetons vivent en cookies httpOnly posés par le
+ * BFF (/api/admin-session/*) — jamais côté JS (audit §07). Le client ne
+ * conserve que le profil (non sensible) pour l'affichage ; l'API reste
+ * l'autorité à chaque requête via le proxy.
+ */
 interface AuthCtx {
   admin: AdminInfo | null;
   isLoading: boolean;
-  login: (accessToken: string, refreshToken: string, admin: AdminInfo) => void;
+  login: (admin: AdminInfo) => void;
   logout: () => void;
 }
 
@@ -45,34 +51,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Profil d'affichage uniquement — la session réelle est le cookie httpOnly.
     const stored = localStorage.getItem('fe_admin');
-    const token = localStorage.getItem('fe_access_token');
-    if (stored && token) {
+    if (stored) {
       try {
         setAdmin(JSON.parse(stored));
       } catch {
-        localStorage.clear();
+        localStorage.removeItem('fe_admin');
       }
     }
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(
-    (accessToken: string, refreshToken: string, adminData: AdminInfo) => {
-      localStorage.setItem('fe_access_token', accessToken);
-      localStorage.setItem('fe_refresh_token', refreshToken);
-      localStorage.setItem('fe_admin', JSON.stringify(adminData));
-      setAdmin(adminData);
-    },
-    [],
-  );
+  const login = useCallback((adminData: AdminInfo) => {
+    localStorage.setItem('fe_admin', JSON.stringify(adminData));
+    setAdmin(adminData);
+  }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('fe_access_token');
-    localStorage.removeItem('fe_refresh_token');
-    localStorage.removeItem('fe_admin');
-    setAdmin(null);
-    router.push('/admin/login');
+    // Efface les cookies httpOnly côté serveur, puis purge le profil local.
+    fetch('/api/admin-session/logout', { method: 'POST' })
+      .catch(() => {})
+      .finally(() => {
+        localStorage.removeItem('fe_admin');
+        setAdmin(null);
+        router.push('/admin/login');
+      });
   }, [router]);
 
   return (
