@@ -19,6 +19,10 @@ class Admin(Base):
     role: Mapped[str] = mapped_column(String(20), default="agent")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     two_factor_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Secret 2FA en attente de confirmation : posé par /setup, promu vers
+    # two_factor_secret uniquement après un premier OTP validé (/verify). Tant
+    # qu'il vit ici, il n'affecte pas le login → pas de verrouillage (audit §C.1).
+    two_factor_secret_temp: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

@@ -51,13 +51,14 @@ class QRService:
             "iat": int(datetime.now(timezone.utc).timestamp()),
             "type": TOKEN_TYPE_QR,
         }
-        return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        # Signé avec la clé DÉDIÉE billets, pas le secret de session (audit §E.2).
+        return jwt.encode(payload, settings.ticket_signing_key, algorithm=settings.ALGORITHM)
 
     def decode_ticket_jwt(self, token: str) -> QRClaims | None:
         """Retourne les claims si valide, None sinon."""
         try:
             payload = jwt.decode(
-                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+                token, settings.ticket_signing_key, algorithms=[settings.ALGORITHM]
             )
         except JWTError:
             return None

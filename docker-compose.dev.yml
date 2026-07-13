@@ -1,0 +1,76 @@
+# Environnement de développement local — FarahEvent backend (audit §G.1, Plan §0.2).
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Démarre PostgreSQL 16 + Redis 7 + l'API FastAPI (migration Alembic auto au boot,
+# puis uvicorn --reload avec le code monté en volume pour le hot-reload).
+# Une fois lancé :  http://localhost:8000/health  et  http://localhost:8000/docs
+#
+# Premier super_admin (une fois les conteneurs up) :
+#   docker compose -f docker-compose.dev.yml exec backend \
+#     python -m scripts.create_super_admin admin@farahevent.tech "Str0ngP@ss!" William Mickey
+
+name: farahevent-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: farahevent_user
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: farahevent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U farahevent_user -d farahevent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./farahevent-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      DEBUG: "True"
+      # Dev uniquement — surchargé par de vraies clés en prod (le boot-guard l'exige).
+      SECRET_KEY: dev-secret-session-key-not-for-prod-000000
+      TICKET_SIGNING_KEY: dev-ticket-signing-key-not-for-prod-000000
+      DATABASE_URL: postgresql+asyncpg://farahevent_user:devpassword@postgres:5432/farahevent
+      DATABASE_URL_SYNC: postgresql+psycopg2://farahevent_user:devpassword@postgres:5432/farahevent
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_URL: http://localhost:3000
+      # Le backend (conteneur) joint le frontend (hôte) via host.docker.internal pour la revalidation ISR.
+      FRONTEND_INTERNAL_URL: http://host.docker.internal:3000
+      REVALIDATE_SECRET: dev-revalidate-secret
+      API_URL: http://localhost:8000/api/v1
+    ports:
+      - "8000:8000"
+    volumes:
+      # Code monté pour le hot-reload ; l'anonymous volume protège le venv/site-packages.
+      - ./farahevent-backend:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  pgdata:
+  redisdata:

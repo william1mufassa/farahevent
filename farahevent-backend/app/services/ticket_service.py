@@ -22,18 +22,37 @@ class TicketGenerationError(Exception):
     pass
 
 
+class StockExceededError(Exception):
+    """Levée quand la formule est épuisée au moment de l'émission (anti-oversell)."""
+    pass
+
+
 class TicketService:
     async def generate_for_order(self, order: Order, db: AsyncSession) -> list[Ticket]:
-        """Génère les billets pour un order — idempotent."""
+        """Génère les billets pour un order — idempotent et protégé contre l'oversell.
+
+        Verrou pessimiste (SELECT ... FOR UPDATE) sur la formule : sérialise les
+        émissions concurrentes d'une même formule, avec garde de stock transactionnelle
+        et compteur `sold_quantity` exact (audit A.2/E.3 — la survente venait de N
+        commandes validées en parallèle sans re-vérifier le stock au moment d'émettre).
+        """
+        # Verrou sur la formule AVANT toute décision d'émission.
+        formula_result = await db.execute(
+            select(Formula).where(Formula.id == order.formula_id).with_for_update()
+        )
+        formula = formula_result.scalar_one_or_none()
+        if not formula:
+            raise TicketGenerationError(f"Formule introuvable pour order {order.id}")
+
+        # Idempotence sous verrou : si les billets existent déjà, on les renvoie.
         existing_result = await db.execute(select(Ticket).where(Ticket.order_id == order.id))
         existing = existing_result.scalars().all()
         if existing:
             return list(existing)
 
-        formula_result = await db.execute(select(Formula).where(Formula.id == order.formula_id))
-        formula = formula_result.scalar_one_or_none()
-        if not formula:
-            raise TicketGenerationError(f"Formule introuvable pour order {order.id}")
+        # Garde de stock transactionnelle : refuse si épuisé.
+        if formula.stock is not None and formula.sold_quantity >= formula.stock:
+            raise StockExceededError(f"Formule '{formula.name}' épuisée (stock {formula.stock})")
 
         event_result = await db.execute(select(Event).where(Event.id == order.event_id))
         event = event_result.scalar_one_or_none()
@@ -96,8 +115,11 @@ class TicketService:
             )
             tickets.append(live_ticket)
 
-        # Stock (info non transactionnelle : la vraie protection est le lock sur la commande)
-        formula.sold_quantity += len(tickets)
+        # Une commande = une place vendue, même si elle émet 2 billets (QR + live
+        # pour une formule 'both'). Incrément sous le verrou FOR UPDATE acquis plus
+        # haut → compteur exact, pas de survente (audit §E.3 + A.2).
+        if tickets:
+            formula.sold_quantity += 1
 
         await db.flush()
         return tickets

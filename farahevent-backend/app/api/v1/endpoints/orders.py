@@ -8,7 +8,7 @@ Flow :
 """
 import uuid
 from decimal import Decimal
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -31,6 +31,8 @@ from app.models.payment_config import PaymentConfig
 from app.schemas.order import OrderCreateRequest, OrderCreateResponse, OrderPublicStatus
 from app.services.payment_provider import payment_provider
 from app.services.upload_service import upload_service
+from app.services.turnstile_service import turnstile_service
+from app.core.rate_limit import limiter
 
 router = APIRouter()
 
@@ -39,12 +41,20 @@ router = APIRouter()
 
 
 @router.post("/", response_model=OrderCreateResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(data: OrderCreateRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def create_order(
+    request: Request, data: OrderCreateRequest, db: AsyncSession = Depends(get_db)
+):
     """Crée une commande anonyme et initie le paiement.
 
     - **payment_mode=digital** : retourne l'URL du provider (stub pour l'instant).
     - **payment_mode=manual**  : le frontend redirige vers l'écran d'upload de preuve.
     """
+    # Anti-bot (audit §C.3) — no-op si TURNSTILE_SECRET_KEY non configuré (dev).
+    client_ip = request.client.host if request.client else None
+    if not await turnstile_service.verify(data.turnstile_token, client_ip):
+        raise HTTPException(status_code=400, detail="Vérification anti-robot échouée. Réessayez.")
+
     event = await _load_active_event(db, data.event_id)
     formula = await _load_formula(db, data.formula_id, event.id)
 

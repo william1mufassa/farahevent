@@ -5,27 +5,28 @@
 """
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_roles
 from app.models.admin import Admin
 from app.models.enums import AdminRole, ManualPaymentStatus, OrderStatus
-from app.models.event import Event
-from app.models.formula import Formula
 from app.models.manual_payment import ManualPayment
 from app.models.order import Order
-from app.models.participant import Participant
 from app.schemas.manual_payment import (
     ManualPaymentOut,
     ManualPaymentRejectRequest,
     ManualPaymentValidateResponse,
 )
 from app.services.audit_service import audit_service
-from app.services.ticket_service import ticket_service
+from app.services.ticket_service import StockExceededError, ticket_service
 
 router = APIRouter()
 
@@ -37,19 +38,25 @@ _viewer_roles = require_roles(
 )
 
 
-async def _hydrate(mp: ManualPayment, db: AsyncSession) -> ManualPaymentOut:
-    order = (await db.execute(select(Order).where(Order.id == mp.order_id))).scalar_one_or_none()
+# Chargement eager des relations en un nombre constant de requêtes (order +
+# participant/event/formula) — supprime le N+1 de la liste (audit §D.1).
+_EAGER = (
+    selectinload(ManualPayment.order).options(
+        selectinload(Order.participant),
+        selectinload(Order.event),
+        selectinload(Order.formula),
+    ),
+)
+
+
+def _to_out(mp: ManualPayment) -> ManualPaymentOut:
+    """Construit la réponse depuis les relations déjà chargées — aucune requête."""
+    order = mp.order
     if not order:
         raise HTTPException(status_code=500, detail="Order manquant pour ce manual_payment")
-    participant = (
-        await db.execute(select(Participant).where(Participant.id == order.participant_id))
-    ).scalar_one_or_none()
-    event = (
-        await db.execute(select(Event).where(Event.id == order.event_id))
-    ).scalar_one_or_none()
-    formula = (
-        await db.execute(select(Formula).where(Formula.id == order.formula_id))
-    ).scalar_one_or_none()
+    participant = order.participant
+    event = order.event
+    formula = order.formula
 
     return ManualPaymentOut(
         id=str(mp.id),
@@ -57,7 +64,8 @@ async def _hydrate(mp: ManualPayment, db: AsyncSession) -> ManualPaymentOut:
         operator=mp.operator,
         sender_name=mp.sender_name,
         sender_country=mp.sender_country,
-        receipt_image_url=mp.receipt_image_url,
+        # Chemin de la route admin authentifiée (et non l'URL publique) — audit §C.2.
+        receipt_image_url=f"/admin/manual-payments/{mp.id}/receipt",
         status=mp.status,
         rejection_reason=mp.rejection_reason,
         validated_by=str(mp.validated_by) if mp.validated_by else None,
@@ -96,14 +104,14 @@ async def list_manual_payments(
     _admin: Admin = Depends(_viewer_roles),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(ManualPayment).order_by(ManualPayment.created_at.desc())
+    stmt = select(ManualPayment).options(*_EAGER).order_by(ManualPayment.created_at.desc())
     if status_filter:
         allowed = {s.value for s in ManualPaymentStatus}
         if status_filter not in allowed:
             raise HTTPException(status_code=400, detail=f"status invalide, autorisés : {sorted(allowed)}")
         stmt = stmt.where(ManualPayment.status == status_filter)
     result = await db.execute(stmt)
-    return [await _hydrate(mp, db) for mp in result.scalars().all()]
+    return [_to_out(mp) for mp in result.scalars().all()]
 
 
 @router.get("/{mp_id}", response_model=ManualPaymentOut)
@@ -111,7 +119,25 @@ async def get_manual_payment(
     mp_id: str, _admin: Admin = Depends(_viewer_roles), db: AsyncSession = Depends(get_db)
 ):
     mp = await _load(db, mp_id)
-    return await _hydrate(mp, db)
+    return _to_out(mp)
+
+
+@router.get("/{mp_id}/receipt")
+async def get_receipt(
+    mp_id: str, _admin: Admin = Depends(_viewer_roles), db: AsyncSession = Depends(get_db)
+):
+    """Sert l'image du reçu — réservé aux rôles autorisés (audit §C.2). Remplace
+    l'ancien accès statique public à /uploads/receipts/."""
+    mp = await _load(db, mp_id)
+    base = Path(settings.UPLOAD_DIR).resolve()
+    key = mp.receipt_image_url.lstrip("/")
+    if key.startswith("uploads/"):  # tolère d'anciennes valeurs préfixées
+        key = key[len("uploads/") :]
+    target = (base / key).resolve()
+    # Garde anti-traversée de chemin : le fichier doit rester sous UPLOAD_DIR.
+    if not target.is_relative_to(base) or not target.is_file():
+        raise HTTPException(status_code=404, detail="Reçu introuvable")
+    return FileResponse(target)
 
 
 @router.post("/{mp_id}/validate", response_model=ManualPaymentValidateResponse)
@@ -136,7 +162,12 @@ async def validate_manual_payment(
     order.status = OrderStatus.MANUAL_VALIDATED.value
     await db.flush()
 
-    tickets = await ticket_service.generate_for_order(order, db)
+    try:
+        tickets = await ticket_service.generate_for_order(order, db)
+    except StockExceededError as e:
+        # Formule épuisée au moment d'émettre : toute la transaction est annulée
+        # par get_db (mp + order reviennent à leur état antérieur MANUAL_PENDING).
+        raise HTTPException(status_code=409, detail=str(e))
 
     await audit_service.log(
         db, admin=admin, action="manual_payment.validate",
@@ -188,7 +219,9 @@ async def _load(db: AsyncSession, mp_id: str) -> ManualPayment:
         parsed = uuid.UUID(mp_id)
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="ID invalide")
-    r = await db.execute(select(ManualPayment).where(ManualPayment.id == parsed))
+    r = await db.execute(
+        select(ManualPayment).options(*_EAGER).where(ManualPayment.id == parsed)
+    )
     mp = r.scalar_one_or_none()
     if not mp:
         raise HTTPException(status_code=404, detail="Paiement manuel non trouvé")

@@ -1,12 +1,14 @@
 """Auth admin — login + refresh. Support 2FA TOTP optionnel."""
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -41,7 +43,8 @@ class TwoFactorRequired(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse, responses={202: {"model": TwoFactorRequired}})
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/15minutes")
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Admin).where(Admin.email == data.email))
     admin = result.scalar_one_or_none()
 
@@ -68,7 +71,14 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Token invalide")
 
-    result = await db.execute(select(Admin).where(Admin.id == payload.get("sub")))
+    # `sub` est une str : la caster en UUID (cohérent avec get_current_admin, sinon
+    # la comparaison colonne UUID == str ne matche pas → refresh KO).
+    try:
+        admin_uuid = uuid.UUID(payload.get("sub"))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Token invalide")
+
+    result = await db.execute(select(Admin).where(Admin.id == admin_uuid))
     admin = result.scalar_one_or_none()
     if not admin or not admin.is_active:
         raise HTTPException(status_code=401, detail="Compte introuvable ou désactivé")

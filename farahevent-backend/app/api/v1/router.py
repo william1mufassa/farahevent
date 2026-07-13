@@ -6,10 +6,14 @@ from app.api.v1.endpoints.admin import (
     audit_logs,
     chatbot_faqs,
     cms,
+    dashboard,
     email_automations,
+    event_draft,
     events as admin_events,
+    finance,
     formulas,
     manual_payments,
+    participants,
     payment_config,
     two_factor,
     whatsapp_groups,
@@ -28,6 +32,11 @@ api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"]
 api_router.include_router(auth.router, prefix="/admin/auth", tags=["Admin · Auth"])
 api_router.include_router(two_factor.router, prefix="/admin/auth/2fa", tags=["Admin · 2FA"])
 
+# --- Admin — Dashboard (stats + notifications)
+api_router.include_router(dashboard.router, prefix="/admin", tags=["Admin · Dashboard"])
+api_router.include_router(participants.router, prefix="/admin", tags=["Admin · Participants"])
+api_router.include_router(finance.router, prefix="/admin", tags=["Admin · Finances"])
+
 # --- Admin — CRUD ressources
 api_router.include_router(admins.router, prefix="/admin/admins", tags=["Admin · Collaborateurs"])
 api_router.include_router(admin_events.router, prefix="/admin/events", tags=["Admin · Événements"])
@@ -43,3 +52,6 @@ api_router.include_router(
 api_router.include_router(
     audit_logs.router, prefix="/admin/audit-logs", tags=["Admin · Audit trail"]
 )
+# ⚠ APRÈS admin_events : la route générique PATCH /events/{id}/{section} ne doit pas
+# court-circuiter /events/{id}/status ni /events/{id} (garde de transition de statut).
+api_router.include_router(event_draft.router, prefix="/admin", tags=["Admin · CMS brouillon"])

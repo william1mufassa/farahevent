@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -48,3 +48,8 @@ class Ticket(Base):
     event = relationship("Event", back_populates="tickets")
     formula = relationship("Formula", back_populates="tickets")
     scan_logs = relationship("ScanLog", back_populates="ticket")
+
+    __table_args__ = (
+        # Lookups fréquents par commande (génération, resend, scan) — audit §D
+        Index("ix_tickets_order_id", "order_id"),
+    )

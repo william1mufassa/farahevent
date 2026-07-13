@@ -32,7 +32,8 @@ class UploadService:
         self.base_dir = Path(base_dir or settings.UPLOAD_DIR)
 
     async def save_receipt(self, upload: UploadFile) -> str:
-        """Enregistre une preuve de paiement manuel. Retourne l'URL publique relative."""
+        """Enregistre une preuve de paiement manuel. Retourne la clé de stockage
+        relative (sous UPLOAD_DIR) — jamais une URL publique (audit §C.2)."""
         if upload.content_type not in ALLOWED_MIME:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -69,10 +70,10 @@ class UploadService:
         with open(target_path, "wb") as fh:
             fh.write(content)
 
-        # URL publique servie par nginx (à monter en front de /uploads/ sur le VPS)
-        # ou par FastAPI en dev.
-        rel_url = f"/uploads/{rel_dir.as_posix()}/{filename}"
-        return rel_url
+        # Clé de stockage RELATIVE à UPLOAD_DIR (et non une URL publique) : les reçus
+        # contiennent des données financières et ne sont servis que via la route admin
+        # authentifiée GET /admin/manual-payments/{id}/receipt (audit §C.2).
+        return f"{rel_dir.as_posix()}/{filename}"  # ex: receipts/2026/07/<uuid>.jpg
 
 
 upload_service = UploadService()

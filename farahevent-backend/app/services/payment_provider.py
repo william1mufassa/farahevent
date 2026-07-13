@@ -43,7 +43,11 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     async def get_status(self, checkout_id: str) -> str:
-        """Retourne le statut brut du provider (à mapper vers OrderStatus)."""
+        """Retourne un statut NORMALISÉ dans {"pending", "paid", "failed"}.
+
+        Consommé tel quel par le job de réconciliation — chaque provider concret
+        mappe ses propres statuts vers ces trois valeurs.
+        """
         ...
 
 

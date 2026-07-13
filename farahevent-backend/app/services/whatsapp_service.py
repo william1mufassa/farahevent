@@ -1,5 +1,9 @@
+import logging
+
 import httpx
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class WhatsAppService:
@@ -10,40 +14,46 @@ class WhatsAppService:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        # Client HTTP partagé : réutilise le pool de connexions TCP au lieu d'en
+        # recréer un (et une poignée de main TLS) à chaque message — évite la
+        # saturation de sockets sous charge (audit §D.3). Fermé via le lifespan.
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=30)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
 
     async def send_text(self, phone: str, message: str) -> dict:
         """Envoie un message texte via OpenWA."""
-        # Normaliser le numéro (format CI: 225XXXXXXXX)
         phone_normalized = self._normalize_phone(phone)
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}/api/sendText",
-                json={"to": f"{phone_normalized}@c.us", "content": message},
-                headers=self.headers,
-                timeout=30,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await self._get_client().post(
+            f"{self.api_url}/api/sendText",
+            json={"to": f"{phone_normalized}@c.us", "content": message},
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def send_image(self, phone: str, image_base64: str, caption: str = "") -> dict:
         """Envoie une image (QR code) via OpenWA."""
         phone_normalized = self._normalize_phone(phone)
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}/api/sendImage",
-                json={
-                    "to": f"{phone_normalized}@c.us",
-                    "base64": image_base64,
-                    "filename": "billet_farahevent.png",
-                    "caption": caption,
-                },
-                headers=self.headers,
-                timeout=30,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await self._get_client().post(
+            f"{self.api_url}/api/sendImage",
+            json={
+                "to": f"{phone_normalized}@c.us",
+                "base64": image_base64,
+                "filename": "billet_farahevent.png",
+                "caption": caption,
+            },
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def send_ticket_confirmation(
         self,
@@ -103,8 +113,10 @@ class WhatsAppService:
 
             return True
 
-        except Exception as e:
-            print(f"Erreur envoi WhatsApp: {e}")
+        except Exception:
+            # Logging structuré au lieu d'un print silencieux (audit §E.1) — un
+            # échec de livraison doit être traçable/alertable, pas noyé en stdout.
+            logger.exception("Échec de l'envoi WhatsApp du billet (ticket=%s)", ticket_id)
             return False
 
     def _normalize_phone(self, phone: str) -> str:

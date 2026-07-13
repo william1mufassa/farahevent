@@ -16,6 +16,8 @@ class OrderCreateRequest(BaseModel):
     payment_method_label: str | None = Field(
         None, max_length=50, description="ex: wave/orange_money/mtn/card"
     )
+    # Jeton Cloudflare Turnstile — vérifié côté serveur si TURNSTILE_SECRET_KEY posé
+    turnstile_token: str | None = Field(None, max_length=2048)
 
 
 class OrderCreateResponse(BaseModel):

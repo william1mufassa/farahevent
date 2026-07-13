@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Text, Numeric
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Text, Numeric, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -32,6 +32,11 @@ class Formula(Base):
     event = relationship("Event", back_populates="formulas")
     orders = relationship("Order", back_populates="formula")
     tickets = relationship("Ticket", back_populates="formula")
+
+    __table_args__ = (
+        # Lookups fréquents par événement (formules publiques + admin) — audit §D
+        Index("ix_formulas_event_id", "event_id"),
+    )
 
     @property
     def available_quantity(self) -> int | None:

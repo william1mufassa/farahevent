@@ -56,7 +56,12 @@ async function handler(request: NextRequest) {
   try {
     let upstream = await forward(access);
 
-    if (upstream.status === 401 && refresh) {
+    // Rafraîchit si le backend rejette le jeton (401) OU si l'access a expiré côté
+    // navigateur (cookie tombé → aucun Bearer transmis → 403 HTTPBearer), dès qu'un
+    // refresh token subsiste. Sans le cas 403+!access, toute session cassait à 30 min.
+    const shouldRefresh =
+      !!refresh && (upstream.status === 401 || (upstream.status === 403 && !access));
+    if (shouldRefresh) {
       const refreshRes = await fetch(`${API_URL}/admin/auth/refresh`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
