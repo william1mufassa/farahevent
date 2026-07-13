@@ -14,6 +14,7 @@ from app.models.event import Event
 from app.models.formula import Formula
 from app.schemas.event_admin import FormulaAdminOut, FormulaCreate, FormulaUpdate
 from app.services.audit_service import audit_service
+from app.services.revalidate_service import revalidate_service
 
 router = APIRouter()
 _manager = require_roles(AdminRole.SUPER_ADMIN, AdminRole.MANAGER)
@@ -79,6 +80,8 @@ async def create_formula(
         resource_type="formula", resource_id=str(f.id),
         payload={"event_id": str(e.id), "name": f.name}, request=request,
     )
+    # Formule visible sur la landing publique → invalide le cache ISR (suivi ISR).
+    await revalidate_service.revalidate_event(e.slug)
     return _to_out(f)
 
 
@@ -104,6 +107,7 @@ async def update_formula(
         resource_type="formula", resource_id=str(f.id),
         payload=changes, request=request,
     )
+    await revalidate_service.revalidate_event_by_id(db, f.event_id)
     return _to_out(f)
 
 
@@ -122,6 +126,7 @@ async def delete_formula(
         resource_type="formula", resource_id=str(f.id),
         request=request,
     )
+    await revalidate_service.revalidate_event_by_id(db, f.event_id)
 
 
 async def _load_event(db: AsyncSession, event_id: str) -> Event:

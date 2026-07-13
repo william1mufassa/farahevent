@@ -49,6 +49,34 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token invalide ou expiré")
 
 
+def create_ws_ticket(admin_id: str, role: str) -> str:
+    """Ticket court-terme d'ouverture du WebSocket admin.
+
+    Le JWT de session vit en cookie httpOnly, non transmis au handshake WS
+    (cross-origin). Le front échange ce ticket via le BFF authentifié puis le
+    passe en query param. `type` distinct de "access" : un ticket ne peut pas
+    servir de jeton de session (ni l'inverse) — cf. get_current_admin.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(seconds=settings.WS_TICKET_EXPIRE_SECONDS)
+    to_encode = {"sub": admin_id, "role": role, "exp": expire, "type": "ws_ticket"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_ws_ticket(token: str) -> Optional[dict]:
+    """Décode/valide un ticket WS. Retourne le payload, ou None si invalide
+    (signature, expiration, type incorrect). Conçu pour le handshake WS où l'on
+    ferme la socket au lieu de lever une HTTPException."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("type") != "ws_ticket":
+        return None
+    return payload
+
+
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: AsyncSession = Depends(get_db),

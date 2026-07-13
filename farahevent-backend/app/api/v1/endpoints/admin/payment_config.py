@@ -13,6 +13,7 @@ from app.models.enums import AdminRole
 from app.models.payment_config import PaymentConfig
 from app.schemas.event_admin import PaymentConfigUpsert
 from app.services.audit_service import audit_service
+from app.services.revalidate_service import revalidate_service
 
 router = APIRouter()
 _manager = require_roles(AdminRole.SUPER_ADMIN, AdminRole.MANAGER)
@@ -85,6 +86,8 @@ async def upsert_config(
         resource_type="payment_config", resource_id=str(parsed),
         payload=changes, request=request,
     )
+    # Les modes de paiement pilotent la page d'achat publique → invalide l'ISR.
+    await revalidate_service.revalidate_event_by_id(db, parsed)
     return _to_out(cfg)
 
 

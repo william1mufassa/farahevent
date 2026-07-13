@@ -6,7 +6,9 @@ Flow :
 2. POST /orders/{id}/manual-payment    → soumet la preuve pour un paiement manuel.
 3. GET  /orders/{id}                   → statut public (polling frontend).
 """
+import logging
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,9 +32,12 @@ from app.models.participant import Participant
 from app.models.payment_config import PaymentConfig
 from app.schemas.order import OrderCreateRequest, OrderCreateResponse, OrderPublicStatus
 from app.services.payment_provider import payment_provider
+from app.services.notification_hub import manual_payment_notification, notification_hub
 from app.services.upload_service import upload_service
 from app.services.turnstile_service import turnstile_service
 from app.core.rate_limit import limiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -191,6 +196,37 @@ async def submit_manual_payment(
     order.payment_method_label = operator
 
     await db.flush()
+
+    # Notifie en temps réel les admins connectés (fire-and-forget : n'affecte
+    # jamais la soumission du client si le hub, la requête ou une socket échoue).
+    # Le store front déduplique par id (mp-<id>) avec le seed HTTP.
+    try:
+        row = (
+            await db.execute(
+                select(Participant.first_name, Participant.last_name, Formula.name)
+                .select_from(Order)
+                .join(Participant, Participant.id == Order.participant_id)
+                .join(Formula, Formula.id == Order.formula_id)
+                .where(Order.id == order.id)
+            )
+        ).first()
+        if row:
+            fn, ln, formula_name = row
+            await notification_hub.broadcast(
+                {
+                    "type": "notification",
+                    "notification": manual_payment_notification(
+                        mp_id=manual_payment.id,
+                        created_at=datetime.now(timezone.utc),
+                        operator=manual_payment.operator,
+                        first_name=fn,
+                        last_name=ln,
+                        formula_name=formula_name,
+                    ),
+                }
+            )
+    except Exception:
+        logger.warning("Push WS notification (paiement manuel) échoué", exc_info=True)
 
     return {
         "order_id": str(order.id),

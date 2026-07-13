@@ -12,6 +12,7 @@ from app.models.enums import AdminRole
 from app.models.event_content import EventContent
 from app.schemas.event_admin import EventContentOut, EventContentUpsert
 from app.services.audit_service import audit_service
+from app.services.revalidate_service import revalidate_service
 
 router = APIRouter()
 _manager = require_roles(AdminRole.SUPER_ADMIN, AdminRole.MANAGER)
@@ -65,6 +66,10 @@ async def upsert_content(
         resource_type="event_content", resource_id=str(parsed),
         payload={"changes": changed_keys}, request=request,
     )
+
+    # Le contenu CMS alimente la landing → invalide l'ISR si qqch a changé (suivi ISR).
+    if changed_keys:
+        await revalidate_service.revalidate_event_by_id(db, parsed)
 
     # Retourne l'état final
     final = await db.execute(select(EventContent).where(EventContent.event_id == parsed))

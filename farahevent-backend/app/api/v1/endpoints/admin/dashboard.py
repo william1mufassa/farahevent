@@ -15,8 +15,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.security import create_ws_ticket, require_roles
 from app.models.admin import Admin
 from app.models.enums import AdminRole, ManualPaymentStatus, OrderStatus
 from app.models.formula import Formula
@@ -24,6 +25,7 @@ from app.models.manual_payment import ManualPayment
 from app.models.order import Order
 from app.models.participant import Participant
 from app.models.ticket import Ticket
+from app.services.notification_hub import manual_payment_notification
 
 router = APIRouter()
 
@@ -189,15 +191,24 @@ async def admin_notifications(
     ).all()
 
     return [
-        {
-            "id": f"mp-{mp.id}",
-            "kind": "manual_pending",
-            "title": "Nouveau paiement manuel",
-            "body": f"{fn} {ln} — {formula_name} ({mp.operator})",
-            "at": mp.created_at.isoformat(),
-            "read": False,
-            "urgent": True,
-            "href": "/admin/paiements",
-        }
+        manual_payment_notification(
+            mp_id=mp.id,
+            created_at=mp.created_at,
+            operator=mp.operator,
+            first_name=fn,
+            last_name=ln,
+            formula_name=formula_name,
+        )
         for mp, fn, ln, formula_name in pend
     ]
+
+
+@router.get("/ws-ticket")
+async def ws_ticket(admin: Admin = Depends(_dashboard_roles)):
+    """Émet un ticket court-terme pour ouvrir le WebSocket de notifications.
+
+    Le JWT de session étant en cookie httpOnly (non transmis au handshake WS
+    cross-origin), le front récupère ce ticket via le BFF authentifié puis le
+    passe en query param à `/ws/admin/notifications`. Mêmes rôles que le seed."""
+    ticket = create_ws_ticket(str(admin.id), admin.role)
+    return {"ticket": ticket, "expires_in": settings.WS_TICKET_EXPIRE_SECONDS}

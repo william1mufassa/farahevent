@@ -56,9 +56,11 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (seed) setAll(seed);
   }, [seed, setAll]);
 
-  const wsUrl = admin && !IS_MOCK && pathname !== '/admin/login' ? adminSocketUrl() : null;
-  useWebSocket(wsUrl, {
-    enabled: Boolean(wsUrl),
+  // Fabrique (identité stable) passée telle quelle : la connexion persiste
+  // entre navigations admin et récupère un ticket frais à chaque (re)connexion.
+  const wsEnabled = Boolean(admin) && !IS_MOCK && pathname !== '/admin/login';
+  useWebSocket(wsEnabled ? adminSocketUrl : null, {
+    enabled: wsEnabled,
     onMessage: (data) => {
       const msg = data as AdminWsMessage;
       if (msg?.type === 'notification') {

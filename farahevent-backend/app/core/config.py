@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Ticket WS (court-terme) : le JWT de session est en cookie httpOnly, non
+    # transmis au handshake WebSocket cross-origin. Le front récupère ce ticket
+    # via le BFF authentifié puis le passe en query param à la connexion. TTL
+    # court = fenêtre de rejeu réduite (le ticket transite en clair dans l'URL).
+    WS_TICKET_EXPIRE_SECONDS: int = 60
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://farahevent_user:password@localhost:5432/farahevent"

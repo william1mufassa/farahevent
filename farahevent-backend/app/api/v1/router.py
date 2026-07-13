@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, events, tickets, orders, payments, webhooks
+from app.api.v1.endpoints import auth, events, tickets, orders, payments, webhooks, ws
 from app.api.v1.endpoints.admin import (
     admins,
     audit_logs,
@@ -27,6 +27,7 @@ api_router.include_router(orders.router, prefix="/orders", tags=["Commandes (pub
 api_router.include_router(tickets.router, prefix="/tickets", tags=["Billets"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Paiements"])
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
+api_router.include_router(ws.router, prefix="/ws", tags=["WebSocket (temps réel)"])
 
 # --- Admin — auth
 api_router.include_router(auth.router, prefix="/admin/auth", tags=["Admin · Auth"])

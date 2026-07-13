@@ -7,10 +7,14 @@ immédiatement au lieu d'attendre l'expiration du cache ISR (60 s).
 Fire-and-forget : un échec de revalidation NE casse PAS la sauvegarde admin (on loggue).
 """
 import logging
+import uuid
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +46,18 @@ class RevalidateService:
             resp.raise_for_status()
         except Exception:
             logger.warning("Revalidation ISR échouée pour event:%s", slug, exc_info=True)
+
+    async def revalidate_event_by_id(self, db: AsyncSession, event_id: uuid.UUID) -> None:
+        """Comme `revalidate_event` mais résout le slug depuis l'event_id.
+
+        Pour les endpoints qui n'ont sous la main qu'un event_id (ou un objet
+        enfant : formule, FAQ) et pas le slug. No-op si non configuré (évite une
+        requête inutile). L'autoflush persiste d'abord les mutations en attente.
+        """
+        if not settings.REVALIDATE_SECRET:
+            return
+        slug = await db.scalar(select(Event.slug).where(Event.id == event_id))
+        await self.revalidate_event(slug)
 
 
 revalidate_service = RevalidateService()

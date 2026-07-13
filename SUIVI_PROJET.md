@@ -1,6 +1,6 @@
 # Suivi de projet — FarahEvent
 
-> **Document vivant.** Mis à jour à chaque avancée. Dernière MAJ : **2026-07-13 (session 2 — fin)**.
+> **Document vivant.** Mis à jour à chaque avancée. Dernière MAJ : **2026-07-13 (session 3 — Chantier 3 polish terminé & validé live)**.
 > Objectif : garder en un seul endroit le contexte, ce qui est fait, ce qui reste, comment
 > faire tourner le projet, et la dette connue.
 
@@ -8,18 +8,26 @@
 
 ## 0. Point de reprise (pour la prochaine session)
 
-**Dernier commit poussé** : `da6ad4a` — `fix(ci): lockfile complet multi-plateforme` (branche `main`).
+**Dernier commit poussé** : `a9f19b1` — `test(e2e): tunnel d'achat Playwright + point de reprise suivi` (branche `main`, poussé en début de session 3).
 
 **Travail local NON commité / NON poussé** (à commiter en début de prochaine session) :
-- `e2e/` — projet Playwright isolé (package.json, playwright.config.ts, tests/purchase.spec.ts, .gitignore). 3 tests verts.
-- `SUIVI_PROJET.md` — mises à jour Playwright, CI verte, point de reprise.
+- **Chantier 3 (polish) — terminé & validé end-to-end en live** (voir §5), non versionné :
+  - Backend : `services/notification_hub.py`, `api/v1/endpoints/ws.py` (nouveaux) ; `core/security.py`
+    (`create_ws_ticket`/`decode_ws_ticket`), `core/config.py` (`WS_TICKET_EXPIRE_SECONDS`),
+    `admin/dashboard.py` (`GET /admin/ws-ticket` + refactor seed), `endpoints/orders.py` (push sur
+    paiement manuel), `api/v1/router.py` (montage `/ws`) ; `services/revalidate_service.py`
+    (`revalidate_event_by_id`) + instrumentation ISR de `admin/{formulas,cms,payment_config,chatbot_faqs}.py`.
+  - Frontend : `lib/api/admin/notifications.ts` (`adminSocketUrl` async + ticket), `lib/ws/useWebSocket.ts`
+    (fabrique async), `components/admin/AdminShell.tsx`, `next.config.mjs` (`images.unoptimized`).
+  - Tests : `tests/test_ws_notifications.py` (7 tests). **Suite backend : 32 tests verts.**
+  - `SUIVI_PROJET.md` — cette mise à jour.
 
 **Prochaines actions par priorité** :
-1. **Commiter & pousser** le travail local ci-dessus.
+1. **Commiter & pousser** le Chantier 3 ci-dessus.
 2. **Chantier 2 (finir)** : `PayDunyaProvider` + webhook signé HMAC — dès que les **creds sandbox PayDunya** sont disponibles. Validable avec IPN simulé signé même sans creds réelles.
 3. **Chantier 4** : Livraison billets — service Brevo (email), file Redis OpenWA (retry/DLQ), workflows n8n (rappels J-7…J+7).
 4. **Chantier 5** : DevOps prod — `docker-compose.prod.yml`, Dockerfile frontend, nginx/SSL, backups, Uptime Kuma.
-5. **Chantier 3 (polish)** : Communications endpoint, WS notifications (avec auth), suivi #2 (next/image allowlist), étendre revalidation ISR.
+5. **Chantier 3 (reste)** : endpoint Communications (dépend Brevo/OpenWA — externe) ; **WS multi-worker** (backplane Redis pub/sub avant gunicorn multi-workers, cf. §7) ; robustesse `hero_image_url` vide dans les templates (cf. §7).
 6. **Tests** : ajouter e2e en CI (stack complète), tests de charge (100 achats), Lighthouse mobile > 80 × 4 templates.
 7. **v2** : Streaming live (Ant Media + tokens + player + session Redis + test de charge 3000 viewers).
 
@@ -128,10 +136,10 @@ npm --prefix e2e run test
 |---|---|---|
 | 1 | Sécurité socle | ✅ **Terminé & validé end-to-end** |
 | 2 | Paiement complet | 🟡 **Partiel** (oversell + réconciliation faits ; PayDunya reporté) |
-| 3 | Intégration front↔back | 🟡 **Quasi terminé** (admin + public faits ; comms/WS restants) |
+| 3 | Intégration front↔back | 🟢 **Terminé** (admin + public + WS temps réel + ISR étendue + next/image ; reste : endpoint comms externe) |
 | 4 | Livraison billets & comms | 🔴 À faire (Brevo + file OpenWA + n8n) |
 | 5 | DevOps / prod | 🔴 À faire (compose prod, nginx/SSL, CI, backups) |
-| 6 | Tests & QA | 🟡 **En cours** — pytest backend (25 tests verts) + CI ; Playwright + charge à faire |
+| 6 | Tests & QA | 🟡 **En cours** — pytest backend (32 tests verts) + CI ; Playwright + charge à faire |
 | 7 | Déploiement + docs + formation | 🔴 À faire |
 | v2 | Streaming live | 🔴 Différé après le 1er event |
 
@@ -222,9 +230,32 @@ des contrats que le backend n'implémentait qu'en partie. Il a fallu **construir
 - **Les 4 templates A/B/C/D validés** en live — même config, couleurs pilotées depuis le CMS
   (`--color-primary/--color-bg` injectées), landing + formule + lien d'achat OK sur chacun.
 
+**Polish (session 3) — validé end-to-end en live :**
+- **WS notifications temps réel avec auth** ✅ : endpoint `GET /ws/admin/notifications` (monté sous
+  `/ws`), authentifié par **ticket court-terme** — le JWT de session vit en cookie httpOnly, non
+  transmis au handshake WS (connexion directe au backend, cross-origin). Flux : `GET /admin/ws-ticket`
+  (BFF authentifié, rôles dashboard) émet un JWT `type=ws_ticket` (TTL 60 s, `create_ws_ticket`) ; le
+  front l'échange puis se connecte avec `?ticket=`. Le handshake valide le ticket (`decode_ws_ticket`,
+  type distinct d'`access`) + borne l'Origin, sinon ferme (1008). `notification_hub` (registre
+  in-memory + broadcast robuste) ; **push sur soumission de paiement manuel** (`orders.py`), format
+  partagé avec le seed (`manual_payment_notification`, dédup par `id`). Front : `adminSocketUrl`
+  devient **async** (fetch ticket via le proxy), `useWebSocket` accepte une **fabrique async** (ticket
+  frais à chaque reconnexion, backoff conservé).
+  *Validé live : login → ticket (200) → WS `[accepted]` → paiement manuel public → notif
+  « Awa Diallo — Standard (ria) » reçue en temps réel dans le panneau admin.*
+  ⚠ Hub **single-process** : multi-worker (gunicorn) exigera un backplane Redis pub/sub (§7).
+- **Revalidation ISR étendue** ✅ : `revalidate_service.revalidate_event_by_id(db, event_id)` (résout
+  le slug) branché sur les 8 mutations de `formulas`, `cms` (content), `payment_config`, `chatbot_faqs`
+  — plus seulement `event_draft`. *Validé live : `PATCH /admin/formulas/{id}` → `POST {frontend}/api/revalidate` 200.*
+- **Suivi #2 next/image fermé** ✅ : `images.unoptimized = true` (les visuels — hero, logos, speakers,
+  logo navbar — sont des URLs sur hôtes arbitraires ou des data-URLs saisies par l'admin, non
+  optimisables sans allowlist wildcard = réouverture du DoS optimiseur §07). *Validé live : hero
+  Unsplash (hôte hors ancienne allowlist) chargé (1600 px), `<img>` src direct, aucune image via
+  `/_next/image`.*
+
 ### Chantier 6 — Tests 🟡 (démarré)
 Suite `pytest` backend contre une **base de test Postgres dédiée** (`farahevent_test`), NullPool +
-event loop de session pour l'isolation async, override d'auth pour le RBAC. **25 tests verts** :
+event loop de session pour l'isolation async, override d'auth pour le RBAC. **32 tests verts** :
 - `test_ticket_service.py` — idempotence + garde de stock (anti-oversell) + formule `both` (1 place).
 - `test_reconciliation.py` — paid→billets / failed / stale→FAILED / trop-récent ignoré.
 - `test_manual_payments_http.py` — validation manuelle → billets, puis 409 si stock épuisé (HTTP).
@@ -236,10 +267,13 @@ event loop de session pour l'isolation async, override d'auth pour le RBAC. **25
 - `test_event_status.py` — transitions draft→open (ok) / draft→closed (409).
 - `test_2fa_login.py` — login sans 2FA / secret temp ne verrouille pas (200) / 2FA actif exige OTP (202) / mdp faux (401).
 - `test_participants.py` — total + facettes + filtre par statut.
+- `test_ws_notifications.py` — ticket WS (round-trip + rejet d'un access-token comme ticket) / RBAC
+  `/admin/ws-ticket` (manager 200, agent 403) / hub broadcast + purge des sockets mortes / **push
+  réel** sur soumission de paiement manuel (format `manual_payment_notification`).
 
 Lancement : `bash run_tests.sh`. Deps dans `requirements-dev.txt`.
 
-**CI** : `.github/workflows/ci.yml` — job **backend** (service Postgres + `pytest`, 25 tests) + job
+**CI** : `.github/workflows/ci.yml` — job **backend** (service Postgres + `pytest`, 32 tests) + job
 **frontend** (`npm ci` → `lint` → `typecheck`). **Poussée sur GitHub → les 2 jobs sont VERTS.**
 Repo : https://github.com/william1mufassa/farahevent (branche `main`).
 Correctif appliqué : le `package-lock.json` généré sous Windows omettait des deps transitives
@@ -256,15 +290,17 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 
 ## 6. Ce qui reste à faire
 
-### Chantier 3 (finir)
+### Chantier 3 (reste)
 - **Communications** — `GET /admin/communications/recipients` + `POST /admin/communications/send`
   (dépend de Brevo + OpenWA — externe).
-- **WS notifications temps réel** — `/ws/admin/notifications` (aujourd'hui 403 ; le front dégrade
-  via backoff). À construire **avec auth** (ticket WS via BFF, car le JWT est en cookie httpOnly).
-- **Suivi #2** : `next/image` rejette un `hero_image_url` d'un hôte hors `next.config` remotePatterns
-  → prévoir loader/allowlist pour les images uploadées par l'admin.
-- Étendre la **revalidation ISR** aux autres endpoints qui modifient la landing (formulas, cms
-  content, payment_config, faqs) — aujourd'hui branchée sur `event_draft` uniquement.
+- **WS multi-worker** — le hub `notification_hub` est in-memory (single-process). Avant de passer
+  gunicorn en multi-workers, ajouter un **backplane Redis pub/sub** (sinon un broadcast n'atteint
+  que les sockets du worker courant). Cf. §7.
+- **Robustesse `hero_image_url` vide** — les templates Hero passent `<Image src="">` quand l'event
+  n'a pas de couverture → warning React (`preload` href vide) + « Image missing src ». Prévoir un
+  fallback (couleur/gradient) ou omettre l'`<Image>` si l'URL est vide.
+
+*(Faits en session 3, cf. §5 Polish : WS notifications avec auth, suivi #2 next/image, revalidation ISR étendue.)*
 
 ### Chantier 2 (finir)
 - `PayDunyaProvider` + webhook signé HMAC + idempotence (quand creds sandbox dispo).
@@ -288,7 +324,9 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 
 | Sujet | État |
 |---|---|
-| Tests automatisés | 🟡 **pytest backend (25)** + **Playwright e2e (3, tunnel d'achat)** ; restent **e2e-en-CI + tests de charge** |
+| Tests automatisés | 🟡 **pytest backend (32)** + **Playwright e2e (3, tunnel d'achat)** ; restent **e2e-en-CI + tests de charge** |
+| **WS notifications single-process** (hub in-memory) | 🟡 multi-worker gunicorn ⇒ backplane **Redis pub/sub** requis (§6) |
+| Templates : `<Image src="">` si `hero_image_url` vide (warning preload/src) | 🟡 fallback à prévoir (§6) |
 | CI/CD | 🟢 **CI verte sur GitHub** (backend pytest + front lint/typecheck) ; restent Dockerfile frontend + compose prod (déploiement) |
 | **Logging structuré global** (seul `whatsapp_service` fait) | 🟡 §E.1 audit |
 | Écriture fichier synchrone dans `upload_service` (bloque l'event loop) | 🟡 §D.2, différé |
@@ -327,6 +365,21 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 ---
 
 ## 9. Changelog
+
+### 2026-07-13 — Chantier 3 (polish) terminé & validé end-to-end en live
+- **WS notifications temps réel avec auth** ✅ — endpoint `/ws/admin/notifications` + **ticket
+  court-terme** (`type=ws_ticket`, TTL 60 s) émis via le BFF (`GET /admin/ws-ticket`), hub in-memory
+  (`notification_hub`), push sur soumission de paiement manuel. Front : `adminSocketUrl` async +
+  `useWebSocket` à fabrique async (ticket frais par reconnexion). *Validé live : notif
+  « Awa Diallo — Standard (ria) » reçue en temps réel après un paiement manuel public.*
+- **Revalidation ISR étendue** ✅ — `revalidate_event_by_id` sur `formulas`/`cms`/`payment_config`/
+  `chatbot_faqs` (8 mutations). *Validé live : `PATCH` formule → `POST /api/revalidate` 200.*
+- **Suivi #2 next/image fermé** ✅ — `images.unoptimized = true`. *Validé live : hero Unsplash (hôte
+  hors ancienne allowlist) affiché (1600 px), hors optimiseur.*
+- **Tests 25 → 32** — `test_ws_notifications.py` (ticket, RBAC, hub, push). Handshake WS réel validé
+  (refus sans/mauvais ticket ou access-token, accept avec ticket valide). Stack Docker : boot OK, 32/32 verts.
+- **Poussé en début de session** : `a9f19b1` (`e2e/` + `SUIVI_PROJET.md`, cf. entrée ci-dessous).
+- ⚠ Chantier 3 (code ci-dessus) **pas encore commité/poussé**.
 
 ### 2026-07-13 — fin de session
 - **Point de reprise** ajouté (§0) — travail local non commité listé, prochaines actions séquencées.

@@ -10,7 +10,6 @@ const apiOrigin = (() => {
     return 'http://localhost:8000';
   }
 })();
-const apiHost = new URL(apiOrigin).hostname;
 const apiWs = apiOrigin.replace(/^http/, 'ws');
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -58,15 +57,16 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    // Restreint aux hôtes réellement servis (audit §07 — DoS optimiseur) :
-    // backend (env) + hôtes des fixtures mock.
-    remotePatterns: [
-      { protocol: 'http', hostname: 'localhost' },
-      { protocol: 'https', hostname: apiHost },
-      { protocol: 'https', hostname: 'picsum.photos' },
-      { protocol: 'https', hostname: 'fastly.picsum.photos' },
-      { protocol: 'https', hostname: 'i.pravatar.cc' },
-    ],
+    // Les visuels du site (hero, logos partenaires, photos intervenants, logo
+    // navbar) sont saisis par l'admin via le CMS : soit des URLs sur des hôtes
+    // arbitraires (inconnus au build), soit des data-URLs (dépôt de fichier via
+    // ImageDropzone). Aucun n'est optimisable par l'optimiseur Next sans, au
+    // choix, une allowlist wildcard — qui rouvrirait le DoS optimiseur (audit
+    // §07) — ou un échec pur sur les data-URLs. On sert donc ces images telles
+    // quelles ; la CSP `img-src … https:` borne les hôtes réellement chargeables.
+    // Suivi #2 clos. Réactiver l'optimisation supposera un pipeline d'upload
+    // backend servant les images sur un hôte connu, à réinscrire en remotePatterns.
+    unoptimized: true,
   },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];

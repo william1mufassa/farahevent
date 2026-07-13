@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 
 export type WsStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
 
+/**
+ * Cible du WebSocket : URL directe, `null` (désactivé), ou fabrique async
+ * (ré)évaluée à CHAQUE (re)connexion — indispensable quand l'URL embarque un
+ * ticket court-terme à rafraîchir. La fabrique doit être STABLE en identité
+ * (fonction de module ou mémoïsée) : sinon la connexion se recrée à chaque
+ * render (elle est dans les deps de l'effet).
+ */
+export type WsUrl = string | null | (() => Promise<string | null>);
+
 interface UseWebSocketOptions {
   /** Reçoit chaque message ; JSON parsé si possible, sinon string brute. */
   onMessage?: (data: unknown) => void;
@@ -23,7 +32,7 @@ interface UseWebSocketOptions {
  * SSR-safe (ne se connecte qu'au montage navigateur). Les callbacks sont lus
  * via ref : les changer ne recrée pas la connexion. Teardown strict.
  */
-export function useWebSocket(url: string | null, options: UseWebSocketOptions = {}) {
+export function useWebSocket(url: WsUrl, options: UseWebSocketOptions = {}) {
   const { enabled = true, baseDelay = 1000, maxDelay = 15000 } = options;
   const [status, setStatus] = useState<WsStatus>('idle');
 
@@ -51,42 +60,65 @@ export function useWebSocket(url: string | null, options: UseWebSocketOptions = 
       reconnectTimer = setTimeout(connect, wait);
     };
 
+    // Résout la cible : string directe, ou fabrique async (ticket frais). Toute
+    // erreur de la fabrique → null (nouvelle tentative gérée par le backoff).
+    const resolveUrl = (): Promise<string | null> => {
+      const current = url;
+      if (typeof current === 'function') {
+        try {
+          return Promise.resolve(current()).catch(() => null);
+        } catch {
+          return Promise.resolve(null);
+        }
+      }
+      return Promise.resolve(current);
+    };
+
     function connect() {
       if (closedByUs) return;
       setStatus(attempt === 0 ? 'connecting' : 'reconnecting');
-      try {
-        ws = new WebSocket(url as string);
-      } catch {
-        scheduleReconnect();
-        return;
-      }
 
-      ws.onopen = () => {
-        const wasReconnect = attempt > 0;
-        attempt = 0;
-        setStatus('open');
-        optsRef.current.onOpen?.();
-        if (wasReconnect) optsRef.current.onReconnect?.();
-      };
-
-      ws.onmessage = (event) => {
-        let data: unknown = event.data;
-        try {
-          data = JSON.parse(event.data as string);
-        } catch {
-          /* conserver la string brute */
+      resolveUrl().then((resolved) => {
+        if (closedByUs) return;
+        if (!resolved) {
+          // URL/ticket indisponible (session expirée, backend down…) → backoff.
+          scheduleReconnect();
+          return;
         }
-        optsRef.current.onMessage?.(data);
-      };
+        try {
+          ws = new WebSocket(resolved);
+        } catch {
+          scheduleReconnect();
+          return;
+        }
 
-      ws.onclose = () => {
-        if (!closedByUs) scheduleReconnect();
-      };
+        ws.onopen = () => {
+          const wasReconnect = attempt > 0;
+          attempt = 0;
+          setStatus('open');
+          optsRef.current.onOpen?.();
+          if (wasReconnect) optsRef.current.onReconnect?.();
+        };
 
-      ws.onerror = () => {
-        // onclose suit toujours une erreur → la reconnexion y est gérée.
-        ws?.close();
-      };
+        ws.onmessage = (event) => {
+          let data: unknown = event.data;
+          try {
+            data = JSON.parse(event.data as string);
+          } catch {
+            /* conserver la string brute */
+          }
+          optsRef.current.onMessage?.(data);
+        };
+
+        ws.onclose = () => {
+          if (!closedByUs) scheduleReconnect();
+        };
+
+        ws.onerror = () => {
+          // onclose suit toujours une erreur → la reconnexion y est gérée.
+          ws?.close();
+        };
+      });
     }
 
     connect();

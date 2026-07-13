@@ -12,6 +12,7 @@ from app.models.chatbot_faq import ChatbotFaq
 from app.models.enums import AdminRole
 from app.schemas.event_admin import ChatbotFaqCreate, ChatbotFaqOut, ChatbotFaqUpdate
 from app.services.audit_service import audit_service
+from app.services.revalidate_service import revalidate_service
 
 router = APIRouter()
 _manager = require_roles(AdminRole.SUPER_ADMIN, AdminRole.MANAGER)
@@ -55,6 +56,8 @@ async def create_faq(
         resource_type="chatbot_faq", resource_id=str(f.id),
         payload={"event_id": str(parsed)}, request=request,
     )
+    # La FAQ est rendue sur la landing publique → invalide le cache ISR (suivi ISR).
+    await revalidate_service.revalidate_event_by_id(db, parsed)
     return _to_out(f)
 
 
@@ -72,6 +75,7 @@ async def update_faq(
         resource_type="chatbot_faq", resource_id=str(f.id),
         payload=changes, request=request,
     )
+    await revalidate_service.revalidate_event_by_id(db, f.event_id)
     return _to_out(f)
 
 
@@ -81,11 +85,13 @@ async def delete_faq(
     admin: Admin = Depends(_manager), db: AsyncSession = Depends(get_db),
 ):
     f = await _load(db, faq_id)
+    event_id = f.event_id  # capturé avant delete : l'autoflush de l'audit expire l'objet
     await db.delete(f)
     await audit_service.log(
         db, admin=admin, action="chatbot_faq.delete",
         resource_type="chatbot_faq", resource_id=str(f.id), request=request,
     )
+    await revalidate_service.revalidate_event_by_id(db, event_id)
 
 
 async def _load(db: AsyncSession, faq_id: str) -> ChatbotFaq:
