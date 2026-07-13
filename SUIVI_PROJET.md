@@ -1,8 +1,30 @@
 # Suivi de projet — FarahEvent
 
-> **Document vivant.** Mis à jour à chaque avancée. Dernière MAJ : **2026-07-13**.
+> **Document vivant.** Mis à jour à chaque avancée. Dernière MAJ : **2026-07-13 (session 2 — fin)**.
 > Objectif : garder en un seul endroit le contexte, ce qui est fait, ce qui reste, comment
 > faire tourner le projet, et la dette connue.
+
+---
+
+## 0. Point de reprise (pour la prochaine session)
+
+**Dernier commit poussé** : `da6ad4a` — `fix(ci): lockfile complet multi-plateforme` (branche `main`).
+
+**Travail local NON commité / NON poussé** (à commiter en début de prochaine session) :
+- `e2e/` — projet Playwright isolé (package.json, playwright.config.ts, tests/purchase.spec.ts, .gitignore). 3 tests verts.
+- `SUIVI_PROJET.md` — mises à jour Playwright, CI verte, point de reprise.
+
+**Prochaines actions par priorité** :
+1. **Commiter & pousser** le travail local ci-dessus.
+2. **Chantier 2 (finir)** : `PayDunyaProvider` + webhook signé HMAC — dès que les **creds sandbox PayDunya** sont disponibles. Validable avec IPN simulé signé même sans creds réelles.
+3. **Chantier 4** : Livraison billets — service Brevo (email), file Redis OpenWA (retry/DLQ), workflows n8n (rappels J-7…J+7).
+4. **Chantier 5** : DevOps prod — `docker-compose.prod.yml`, Dockerfile frontend, nginx/SSL, backups, Uptime Kuma.
+5. **Chantier 3 (polish)** : Communications endpoint, WS notifications (avec auth), suivi #2 (next/image allowlist), étendre revalidation ISR.
+6. **Tests** : ajouter e2e en CI (stack complète), tests de charge (100 achats), Lighthouse mobile > 80 × 4 templates.
+7. **v2** : Streaming live (Ant Media + tokens + player + session Redis + test de charge 3000 viewers).
+
+**Comptes de test** : `pilot@farahevent.tech` / `Pilot@Pass1` (super_admin, sans 2FA).
+**Repo GitHub** : https://github.com/william1mufassa/farahevent
 
 ---
 
@@ -89,6 +111,14 @@ bash run_tests.sh                    # toute la suite (crée farahevent_test, in
 bash run_tests.sh -k oversell -v     # un sous-ensemble
 ```
 Base de test dédiée `farahevent_test` (jetable) + NullPool (isolation event loop async).
+
+### E2E (Playwright) — tunnel d'achat
+Prérequis : stack Docker up + frontend dev (:3000) + événement `e2e-forum` semé.
+```bash
+npm --prefix e2e install                                   # 1re fois
+npm --prefix e2e exec -- playwright install chromium        # 1re fois (navigateur)
+npm --prefix e2e run test
+```
 
 ---
 
@@ -209,9 +239,18 @@ event loop de session pour l'isolation async, override d'auth pour le RBAC. **25
 
 Lancement : `bash run_tests.sh`. Deps dans `requirements-dev.txt`.
 
-**CI** : `.github/workflows/ci.yml` — job **backend** (Postgres service + `pytest`) + job **frontend**
-(`npm ci` → `lint` → `typecheck`). YAML validé, frontend lint/typecheck **verts en local**, backend
-pytest prouvé via Docker. ⚠ Pas encore de **remote GitHub** → le workflow tournera dès un `git push`.
+**CI** : `.github/workflows/ci.yml` — job **backend** (service Postgres + `pytest`, 25 tests) + job
+**frontend** (`npm ci` → `lint` → `typecheck`). **Poussée sur GitHub → les 2 jobs sont VERTS.**
+Repo : https://github.com/william1mufassa/farahevent (branche `main`).
+Correctif appliqué : le `package-lock.json` généré sous Windows omettait des deps transitives
+(`@emnapi/core`, `@emnapi/runtime`, `@swc/helpers`) requises par `npm ci` sous Linux → régénéré
+multi-plateforme.
+
+**E2E (Playwright)** : projet **isolé `e2e/`** (n'impacte pas le lockfile frontend / la CI).
+**3 tests verts** sur le tunnel d'achat public : landing (données réelles), navigation vers l'achat,
+et **achat manuel complet** (remplir le formulaire → `POST /orders/` → commande créée → redirection
+`/paiement/manuel?order_id=…`). Nécessite la stack up + l'événement `e2e-forum` semé.
+À faire : job **e2e en CI** (nécessite backend+frontend up) et **tests de charge**.
 
 ---
 
@@ -249,8 +288,8 @@ pytest prouvé via Docker. ⚠ Pas encore de **remote GitHub** → le workflow t
 
 | Sujet | État |
 |---|---|
-| Tests automatisés | 🟡 **pytest backend démarré** (9 tests : billets/oversell/réconciliation/RBAC/scan) ; **Playwright (front) + charge** restent |
-| CI/CD | 🟡 workflow **GitHub Actions écrit** (backend pytest + front lint/typecheck) ; **remote GitHub + Dockerfile frontend + compose prod** restent |
+| Tests automatisés | 🟡 **pytest backend (25)** + **Playwright e2e (3, tunnel d'achat)** ; restent **e2e-en-CI + tests de charge** |
+| CI/CD | 🟢 **CI verte sur GitHub** (backend pytest + front lint/typecheck) ; restent Dockerfile frontend + compose prod (déploiement) |
 | **Logging structuré global** (seul `whatsapp_service` fait) | 🟡 §E.1 audit |
 | Écriture fichier synchrone dans `upload_service` (bloque l'event loop) | 🟡 §D.2, différé |
 | **Pas de révocation** des refresh tokens (logout = cookies seulement) | 🟡 |
@@ -289,14 +328,20 @@ pytest prouvé via Docker. ⚠ Pas encore de **remote GitHub** → le workflow t
 
 ## 9. Changelog
 
-### 2026-07-13 (suite)
+### 2026-07-13 — fin de session
+- **Point de reprise** ajouté (§0) — travail local non commité listé, prochaines actions séquencées.
+- **Playwright e2e** : projet isolé `e2e/`, 3 tests verts (landing, navigation, achat manuel complet
+  → commande créée + redirection). Événement `e2e-forum` semé pour des données déterministes.
+  ⚠ `e2e/` pas encore commité/poussé.
+- **Poussé sur GitHub** (william1mufassa/farahevent, `main`, commit `da6ad4a`) → **CI verte**
+  (backend pytest 25/25 + frontend lint/typecheck). Correctif lockfile multi-plateforme
+  (deps @emnapi/@swc manquantes sous Linux).
 - **Couverture backend étoffée** : 9 → **25 tests** (commande publique, finances, dashboard,
-  transitions de statut, 2FA login anti-lockout, participants). Repo GitHub fourni par le client :
-  https://github.com/william1mufassa/farahevent (à connecter + push pour déclencher la CI).
+  transitions de statut, 2FA login anti-lockout, participants).
 - **CI écrite** : `.github/workflows/ci.yml` (backend pytest + Postgres, frontend lint/typecheck).
-  YAML validé, front lint/typecheck verts en local. Tournera dès qu'un remote GitHub sera ajouté.
-- **Chantier 6 démarré** : suite `pytest` backend (9 tests verts) sur base de test dédiée —
-  billets/anti-oversell, réconciliation, paiement manuel HTTP, RBAC, scan QR single-use.
+- **Chantier 6 démarré** : suite `pytest` backend (25 tests verts) sur base de test dédiée —
+  billets/anti-oversell, réconciliation, paiement manuel HTTP, RBAC, scan QR single-use, commandes
+  publiques, finances, dashboard, statuts event, 2FA, participants.
   Runner `run_tests.sh`, `requirements-dev.txt`, `pytest.ini`, NullPool en test (`DB_NULLPOOL=1`).
 - Suivi #1 **fermé** : hook de revalidation ISR (`revalidate_service`) branché sur le PATCH CMS —
   édition CMS → landing mise à jour instantanément (validé). Ajout `FRONTEND_INTERNAL_URL` +
