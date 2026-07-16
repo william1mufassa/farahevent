@@ -60,27 +60,37 @@ async def reconcile_pending_orders(
             counts["still_pending"] += 1
             continue
 
-        if status == "paid":
-            order.status = OrderStatus.PAID.value
-            try:
-                await ticket_service.generate_for_order(order, db)
-            except StockExceededError:
-                # Cas limite : payé mais stock épuisé entre-temps → alerte pour
-                # traitement manuel (remboursement). L'order reste PAID.
-                logger.error(
-                    "Réconciliation: order %s payé mais formule épuisée — remboursement requis",
-                    order.id,
-                )
-            counts["paid"] += 1
-        elif status == "failed":
-            order.status = OrderStatus.FAILED.value
-            counts["failed"] += 1
-        else:  # "pending"
-            if order.created_at < stale_before:
-                order.status = OrderStatus.FAILED.value
-                counts["stale_failed"] += 1
-            else:
-                counts["still_pending"] += 1
+        try:
+            async with db.begin_nested():
+                if status == "paid":
+                    order.status = OrderStatus.PAID.value
+                    try:
+                        await ticket_service.generate_for_order(order, db)
+                        import asyncio
+                        asyncio.create_task(ticket_service.send_tickets_bg(str(order.id)))
+                    except StockExceededError:
+                        # Cas limite : payé mais stock épuisé entre-temps → alerte pour
+                        # traitement manuel (remboursement). L'order reste PAID.
+                        logger.error(
+                            "Réconciliation: order %s payé mais formule épuisée — remboursement requis",
+                            order.id,
+                        )
+                    counts["paid"] += 1
+                elif status == "failed":
+                    order.status = OrderStatus.FAILED.value
+                    counts["failed"] += 1
+                else:  # "pending"
+                    if order.created_at < stale_before:
+                        order.status = OrderStatus.FAILED.value
+                        counts["stale_failed"] += 1
+                    else:
+                        counts["still_pending"] += 1
+        except Exception:
+            logger.exception(
+                "Réconciliation: erreur inattendue lors du traitement de la commande %s",
+                order.id,
+            )
+            counts["still_pending"] += 1
 
     await db.flush()
     return counts

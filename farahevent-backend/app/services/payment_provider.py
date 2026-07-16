@@ -37,6 +37,7 @@ class PaymentProvider(ABC):
         success_url: str,
         cancel_url: str,
         webhook_url: str,
+        payment_method: str | None = None,
     ) -> CheckoutSession:
         """Initie une session de paiement chez le provider."""
         ...
@@ -73,6 +74,7 @@ class StubPaymentProvider(PaymentProvider):
         success_url: str,
         cancel_url: str,
         webhook_url: str,
+        payment_method: str | None = None,
     ) -> CheckoutSession:
         placeholder_url = f"{settings.FRONTEND_URL}/paiement/attente?order_id={order_id}"
         return CheckoutSession(

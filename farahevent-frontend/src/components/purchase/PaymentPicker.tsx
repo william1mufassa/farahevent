@@ -20,6 +20,34 @@ import {
   type PurchaseFormData,
 } from './schema';
 
+const DIGITAL_LOGOS: Record<DigitalMethod, React.ReactNode[]> = {
+  mobile_money: [
+    <div key="wave" className="flex h-full w-full items-center justify-center bg-[#1dc5ff] text-white font-bold tracking-tighter gap-0.5" style={{ fontSize: '0.45rem' }}><span>🐧</span>Wave</div>,
+    <div key="om" className="flex h-full w-full items-center justify-center bg-[#ff7900] text-white font-bold" style={{ fontSize: '0.5rem' }}>OM</div>,
+    <div key="mtn" className="flex h-full w-full items-center justify-center bg-[#ffcc00] text-[#003366] font-bold tracking-tighter" style={{ fontSize: '0.5rem' }}>MTN</div>,
+  ],
+  card: [
+    <div key="visa" className="flex h-full w-full items-center justify-center text-[#1a1f71] font-bold italic tracking-tighter bg-white" style={{ fontSize: '0.55rem' }}>VISA</div>,
+    <div key="mc" className="flex h-full w-full items-center justify-center bg-white relative">
+      <div className="absolute w-3 h-3 bg-[#eb001b] rounded-full opacity-80" style={{ left: '15%' }}></div>
+      <div className="absolute w-3 h-3 bg-[#f79e1b] rounded-full opacity-80" style={{ right: '15%' }}></div>
+    </div>,
+  ],
+};
+
+const MANUAL_LOGOS: Record<ManualOperator, React.ReactNode[]> = {
+  western_union: [
+    <div key="wu" className="flex h-full w-full items-center justify-center bg-black text-[#ffcc00] font-bold tracking-tighter leading-none" style={{ fontSize: '0.55rem' }}>WU</div>
+  ],
+  ria: [
+    <div key="ria" className="flex h-full w-full items-center justify-center bg-white text-[#f36b21] font-bold tracking-tighter" style={{ fontSize: '0.65rem' }}>ria</div>
+  ],
+  moneygram: [
+    <div key="mg" className="flex h-full w-full items-center justify-center bg-white text-[#d6001c] font-bold italic tracking-tighter leading-none" style={{ fontSize: '0.35rem' }}>Money<br/>Gram</div>
+  ],
+  other: [],
+};
+
 /**
  * Étape 3 — choix du paiement (CDC §4.1) : deux sections visuellement
  * séparées (digital / manuel). Sélectionner un moyen dans une section
@@ -73,6 +101,7 @@ export function PaymentPicker({
                 label={DIGITAL_METHOD_LABELS[method]}
                 selected={mode === 'digital' && digitalMethod === method}
                 onClick={() => pickDigital(method)}
+                logos={DIGITAL_LOGOS[method]}
               />
             ))}
           </div>
@@ -94,6 +123,7 @@ export function PaymentPicker({
                 label={MANUAL_OPERATOR_LABELS[operator]}
                 selected={mode === 'manual' && manualOperator === operator}
                 onClick={() => pickManual(operator)}
+                logos={MANUAL_LOGOS[operator]}
               />
             ))}
           </div>
@@ -158,10 +188,12 @@ function MethodButton({
   label,
   selected,
   onClick,
+  logos = [],
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  logos?: React.ReactNode[];
 }) {
   return (
     <button
@@ -169,14 +201,23 @@ function MethodButton({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        'rounded-md border px-3 py-2.5 text-left text-sm font-medium transition',
+        'flex flex-col items-start gap-3 rounded-md border px-4 py-3 text-left text-sm font-medium transition sm:flex-row sm:items-center sm:justify-between',
         selected
           ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
           : 'hover:bg-black/[0.03]',
       )}
       style={selected ? undefined : SOFT_BORDER}
     >
-      {label}
+      <span>{label}</span>
+      {logos.length > 0 && (
+        <span className="flex items-center gap-1.5 rounded bg-white px-1.5 py-1">
+          {logos.map((logo, i) => (
+            <span key={i} className="flex h-5 w-7 items-center justify-center overflow-hidden rounded-sm border bg-muted/20 text-[8px] font-bold">
+              {logo}
+            </span>
+          ))}
+        </span>
+      )}
     </button>
   );
 }

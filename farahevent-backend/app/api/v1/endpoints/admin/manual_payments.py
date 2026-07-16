@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -144,9 +144,11 @@ async def get_receipt(
 async def validate_manual_payment(
     mp_id: str,
     request: Request,
-    admin: Admin = Depends(_validator_roles),
+    background_tasks: BackgroundTasks,
+    admin: Admin = Depends(require_roles(AdminRole.SUPER_ADMIN, AdminRole.MANAGER)),
     db: AsyncSession = Depends(get_db),
 ):
+    """(Dashboard) Valide un paiement manuel et émet les billets (si stock dispo)."""
     mp = await _load(db, mp_id)
     if mp.status != ManualPaymentStatus.PENDING.value:
         raise HTTPException(status_code=409, detail=f"Déjà traité (statut {mp.status})")
@@ -168,6 +170,9 @@ async def validate_manual_payment(
         # Formule épuisée au moment d'émettre : toute la transaction est annulée
         # par get_db (mp + order reviennent à leur état antérieur MANUAL_PENDING).
         raise HTTPException(status_code=409, detail=str(e))
+
+    # Envoi asynchrone des billets
+    background_tasks.add_task(ticket_service.send_tickets_bg, str(order.id))
 
     await audit_service.log(
         db, admin=admin, action="manual_payment.validate",

@@ -80,12 +80,28 @@ async def create_order(
     # Upsert participant (identifié par email + event)
     participant = await _upsert_participant(db, event_id=event.id, data=data.participant)
 
+    # Calcul des frais dynamiques
+    import math
+    base_price = Decimal(str(formula.price))
+    fee = Decimal("0")
+    if data.payment_mode == "digital" and data.payment_method_label:
+        if data.payment_method_label == "mobile_money":
+            # Frais estimés : ~3.5% + 100 FCFA -> Total = Ceil((Base + 100) / (1 - 0.035))
+            total_float = math.ceil((float(base_price) + 100) / (1 - 0.035))
+            fee = Decimal(str(total_float)) - base_price
+        elif data.payment_method_label == "card":
+            # Frais estimés : ~3.5% + 200 FCFA -> Total = Ceil((Base + 200) / (1 - 0.035))
+            total_float = math.ceil((float(base_price) + 200) / (1 - 0.035))
+            fee = Decimal(str(total_float)) - base_price
+
+    total_amount = base_price + fee
+
     # Création de la commande
     order = Order(
         event_id=event.id,
         formula_id=formula.id,
         participant_id=participant.id,
-        amount=Decimal(str(formula.price)),
+        amount=total_amount,
         currency=formula.currency,
         status=OrderStatus.PENDING.value,
         payment_provider=(
@@ -94,7 +110,7 @@ async def create_order(
             else None  # rempli par le webhook / le provider à l'init
         ),
         payment_method_label=data.payment_method_label,
-        metadata_={"payment_mode": data.payment_mode},
+        metadata_={"payment_mode": data.payment_mode, "base_amount": float(base_price), "fee_amount": float(fee)},
     )
     db.add(order)
     await db.flush()
@@ -111,6 +127,7 @@ async def create_order(
             success_url=f"{settings.FRONTEND_URL}/paiement/succes?order_id={order.id}",
             cancel_url=f"{settings.FRONTEND_URL}/paiement/echec?order_id={order.id}",
             webhook_url=f"{settings.API_URL}/webhooks/{payment_provider.name}",
+            payment_method=data.payment_method_label,
         )
         order.payment_provider = session_result.provider
         order.payment_provider_checkout_id = session_result.checkout_id
@@ -285,7 +302,7 @@ async def _load_active_event(db: AsyncSession, event_id: str) -> Event:
     result = await db.execute(
         select(Event)
         .where(Event.id == parsed)
-        .where(Event.is_deleted.is_(False))
+        .where(Event.is_deleted == False)
     )
     event = result.scalar_one_or_none()
     if not event:
