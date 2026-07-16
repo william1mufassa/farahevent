@@ -3,7 +3,7 @@
 > **Lire CE fichier en premier, et lui seul.** 126 lignes ≈ **1 700 tokens** — contre ~6 800 pour
 > `SUIVI_PROJET.md` (périmé) et le coût bien plus lourd d'une ré-exploration du code.
 >
-> **Dernière MAJ : 2026-07-16 · Session 3 · Sprint S0 à 80 % — reste : CI verte**
+> **Dernière MAJ : 2026-07-16 · Session 3 · Sprint S0 ✅ — reste : ouvrir la PR**
 
 ---
 
@@ -24,11 +24,12 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 
 | Fait | État | Preuve |
 |---|---|---|
-| Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) — `Settings()` OK |
-| Backend démarre | ⏳ **non vérifié** | Docker éteint. La chaîne passe la config et ne bute que sur les deps d'hôte (`jose`) — attendu hors conteneur. **À confirmer : `docker compose up` → `/health` 200** |
-| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 5 commits, 98 fichiers, sur `origin` |
-| Tests | ⏳ **non vérifiés** | Docker éteint. **À confirmer : `bash run_tests.sh`** |
-| CI | ⏳ **non déclenchée** | la CI ne tourne que sur `main` ou PR→`main`. **PR à ouvrir** |
+| Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) |
+| Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
+| Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
+| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 7 commits, sur `origin` |
+| Tests | ✅ **33/33** | vérifié sur **2 passages consécutifs**. ⚠️ la doc annonçait « 32 verts » : c'était faux, la suite était à **20 échecs** |
+| CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
 | Encaissement digital | ❌ **MORT** | provider actif = `StubPaymentProvider()` (vérifié à l'exécution), GeniusPay lève `AttributeError` sur `GENIUSPAY_BASE_URL` |
 | Encaissement manuel | ✅ OK | testé (`test_manual_payments_http.py`) — **seule voie qui marche** |
 | Accès Live | ❌ **CASSÉ** | `live.py:69` exclut `MANUAL_VALIDATED` = tous les clients réels |
@@ -97,6 +98,16 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
    `git clone` vers un chemin sain.
 7. **`.env.local` a `USE_MOCK=1`** et Next **charge `.env.local` en prod**. Sain en `git clone`
    (gitignoré), dangereux en copie de dossier. **Déployer par git, jamais par copie.**
+8. **La suite de tests ne peut PAS détecter une migration oubliée.** `conftest.py:34` construit le
+   schéma via `Base.metadata.create_all` — donc depuis le **modèle**, jamais via Alembic. Un
+   `alembic upgrade head` incomplet reste vert en test **et en CI** pendant que la prod casse.
+   C'est exactement ce qui est arrivé à `events.live_links_sent`. Angle mort structurel.
+9. **`bash run_tests.sh` ne recrée pas `farahevent_test`** (le `CREATE DATABASE` est en `|| true`).
+   Une base de test périmée + `create_all` (qui n'altère jamais une table existante) = échecs
+   fantômes. En cas d'échecs massifs après un changement de modèle : `DROP DATABASE farahevent_test`
+   puis relancer.
+10. **Un test appelait le VRAI serveur OpenWA de production.** Neutralisé par une fixture dans
+    `test_reconciliation.py`. Aucune stratégie de mock globale des dépendances externes n'existe.
 
 ---
 
@@ -116,7 +127,7 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 | Date | Session | Fait | État après |
 |---|---|---|---|
-| 2026-07-16 | 3 | **S0 à 80 %.** `.env` réparé (UTF-8, 53 octets nuls) → config charge. **97 fichiers commités en 5 commits** sur `chantier/live-delivery-admin`, poussée sur `origin` → **travail sauvé**. Zéro secret dans le diff (vérifié). **D1 tranchée : GeniusPay (GO).** Bloqué : Docker éteint → boot + tests non vérifiés ; `gh` absent → PR à ouvrir à la main. | S0 : reste CI verte |
+| 2026-07-16 | 3 | **S0 ✅.** `.env` réparé → config charge. 97 fichiers en 5 commits, poussés → **travail sauvé** (0 secret, vérifié). **D1 tranchée : GeniusPay (GO).** Stack montée : `/health` 200. **3 bugs trouvés en exécutant** : migration `live_links_sent` manquante (live_notifier plantait en boucle) ; handler d'erreur de la réconciliation qui plante lui-même (`MissingGreenlet` sur instance expirée) ; tâche de livraison collectable par le GC. Tests : **20 échecs → 33/33 verts** (2 passages). Reste : ouvrir la PR (`gh` absent). | **S0 terminé** |
 | 2026-07-16 | 2 | Memory system activé (MemPalace wing + graphify). `iron-system` + superpowers installés. Nettoyage : nginx **rapaté** dans `infra/nginx/`, 6 fichiers périmés archivés → `Desktop/_farahevent_archive_2026-07-16/`, caches purgés. `ROADMAP_REMEDIATION.md` + `ETAT.md` créés. | S0 prêt à démarrer |
 | 2026-07-16 | 1 | Audit complet 11 dimensions → **5,5/10**, 5 bloquants vérifiés par exécution. | Audit livré |
 
