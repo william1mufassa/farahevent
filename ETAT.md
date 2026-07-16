@@ -3,7 +3,7 @@
 > **Lire CE fichier en premier, et lui seul.** 126 lignes ≈ **1 700 tokens** — contre ~6 800 pour
 > `SUIVI_PROJET.md` (périmé) et le coût bien plus lourd d'une ré-exploration du code.
 >
-> **Dernière MAJ : 2026-07-16 · Session 2 · Sprint S0 non démarré**
+> **Dernière MAJ : 2026-07-16 · Session 3 · Sprint S0 à 80 % — reste : CI verte**
 
 ---
 
@@ -24,9 +24,12 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 
 | Fait | État | Preuve |
 |---|---|---|
-| Backend démarre | ❌ **NON** | `.env` encodage mixte UTF-8+UTF-16 → `ValidationError` pydantic |
-| Travail poussé | ❌ **NON** | 79 fichiers non commités depuis `e914b94` (2026-07-13) |
-| Encaissement digital | ❌ **MORT** | provider actif = `StubPaymentProvider()`, GeniusPay = code mort |
+| Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) — `Settings()` OK |
+| Backend démarre | ⏳ **non vérifié** | Docker éteint. La chaîne passe la config et ne bute que sur les deps d'hôte (`jose`) — attendu hors conteneur. **À confirmer : `docker compose up` → `/health` 200** |
+| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 5 commits, 98 fichiers, sur `origin` |
+| Tests | ⏳ **non vérifiés** | Docker éteint. **À confirmer : `bash run_tests.sh`** |
+| CI | ⏳ **non déclenchée** | la CI ne tourne que sur `main` ou PR→`main`. **PR à ouvrir** |
+| Encaissement digital | ❌ **MORT** | provider actif = `StubPaymentProvider()` (vérifié à l'exécution), GeniusPay lève `AttributeError` sur `GENIUSPAY_BASE_URL` |
 | Encaissement manuel | ✅ OK | testé (`test_manual_payments_http.py`) — **seule voie qui marche** |
 | Accès Live | ❌ **CASSÉ** | `live.py:69` exclut `MANUAL_VALIDATED` = tous les clients réels |
 | Destruction tracée | ❌ NON | `/admin/database` sans `audit_service`, MANAGER peut hard-delete |
@@ -44,10 +47,18 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 - **OUI** → câbler (déclarer 2 clés dans `config.py`, wirer le provider, webhook HMAC) — 2 j
 - **NON** → retirer le provider, assumer « 1er événement = manuel uniquement » — 2 h
 
-**Ne pas trancher = pire choix** (état actuel : code mort dans le chemin de paiement + zéro encaissement digital).
-Recommandation en cas de doute : **MANUEL-ONLY** — c'est le vrai différenciateur diaspora, il marche, il est testé.
+**Statut : ✅ TRANCHÉE le 2026-07-16 → GeniusPay (branche GO).** PayDunya est abandonné.
 
-**Statut : ⏳ non tranchée.**
+Le travail est fait à ~90 % (provider écrit, interface étendue avec `payment_method`, PaymentPicker
+côté front). **Il manque le dernier kilomètre**, vérifié à l'exécution :
+1. Déclarer `GENIUSPAY_BASE_URL` + `GENIUSPAY_WEBHOOK_SECRET` dans `config.py` (⚠️ les mettre au
+   `.env` ne suffit pas — pydantic refuse les champs extra).
+2. `payment_provider = GeniusPayProvider()` dans `payment_provider.py:91`.
+3. Créer `POST /webhooks/geniuspay` (HMAC sur corps brut + idempotence).
+4. Remonter `verify_webhook_signature` sur l'ABC `PaymentProvider`.
+5. Renseigner `GENIUSPAY_API_KEY` / `GENIUSPAY_SECRET_KEY` dans le `.env`.
+
+→ Détail : `ROADMAP_REMEDIATION.md` §3, branche GO (T1.1).
 
 ---
 
@@ -105,6 +116,7 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 | Date | Session | Fait | État après |
 |---|---|---|---|
+| 2026-07-16 | 3 | **S0 à 80 %.** `.env` réparé (UTF-8, 53 octets nuls) → config charge. **97 fichiers commités en 5 commits** sur `chantier/live-delivery-admin`, poussée sur `origin` → **travail sauvé**. Zéro secret dans le diff (vérifié). **D1 tranchée : GeniusPay (GO).** Bloqué : Docker éteint → boot + tests non vérifiés ; `gh` absent → PR à ouvrir à la main. | S0 : reste CI verte |
 | 2026-07-16 | 2 | Memory system activé (MemPalace wing + graphify). `iron-system` + superpowers installés. Nettoyage : nginx **rapaté** dans `infra/nginx/`, 6 fichiers périmés archivés → `Desktop/_farahevent_archive_2026-07-16/`, caches purgés. `ROADMAP_REMEDIATION.md` + `ETAT.md` créés. | S0 prêt à démarrer |
 | 2026-07-16 | 1 | Audit complet 11 dimensions → **5,5/10**, 5 bloquants vérifiés par exécution. | Audit livré |
 
