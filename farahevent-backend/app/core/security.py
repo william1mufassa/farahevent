@@ -62,6 +62,26 @@ def create_ws_ticket(admin_id: str, role: str) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_live_token(participant_id: str, event_id: str) -> str:
+    """Jeton d'accès au Live pour un participant."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=12) # 12 hours for live duration
+    to_encode = {"sub": participant_id, "event_id": event_id, "exp": expire, "type": "live_access"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_live_token(token: str) -> Optional[dict]:
+    """Décode le jeton d'accès au Live."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("type") != "live_access":
+        return None
+    return payload
+
+
 def decode_ws_ticket(token: str) -> Optional[dict]:
     """Décode/valide un ticket WS. Retourne le payload, ou None si invalide
     (signature, expiration, type incorrect). Conçu pour le handshake WS où l'on

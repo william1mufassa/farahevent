@@ -73,3 +73,23 @@ def manual_payment_notification(
         "urgent": True,
         "href": "/admin/paiements",
     }
+
+
+def ticket_delivery_failure_notification(
+    *,
+    ticket_id: Any,
+    participant_name: str,
+    channel: str,  # 'Email' ou 'WhatsApp'
+) -> dict[str, Any]:
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return {
+        "id": f"dlv-err-{ticket_id}-{channel}",
+        "kind": "delivery_error",
+        "title": f"Échec d'envoi billet ({channel})",
+        "body": f"Le billet de {participant_name} n'a pas pu être envoyé via {channel}.",
+        "at": now.isoformat(),
+        "read": False,
+        "urgent": True,
+        "href": "/admin/commandes",
+    }

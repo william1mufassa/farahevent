@@ -31,6 +31,7 @@ class Event(Base):
     # Streaming (phase 5 — nullable pour l'instant)
     stream_key: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     stream_hls_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    live_links_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("admins.id"), nullable=True
@@ -46,8 +47,8 @@ class Event(Base):
 
     creator = relationship("Admin", back_populates="events")
     formulas = relationship("Formula", back_populates="event", cascade="all, delete-orphan")
-    orders = relationship("Order", back_populates="event")
-    tickets = relationship("Ticket", back_populates="event")
+    orders = relationship("Order", back_populates="event", cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="event", cascade="all, delete-orphan")
     payment_config = relationship(
         "PaymentConfig", back_populates="event", uselist=False, cascade="all, delete-orphan"
     )
@@ -61,4 +62,4 @@ class Event(Base):
     email_automations = relationship(
         "EmailAutomation", back_populates="event", cascade="all, delete-orphan"
     )
-    scan_logs = relationship("ScanLog", back_populates="event")
+    scan_logs = relationship("ScanLog", back_populates="event", cascade="all, delete-orphan")
