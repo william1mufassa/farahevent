@@ -39,6 +39,11 @@ class Ticket(Base):
     # Live (online) — JWT signé, unique
     live_token: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
 
+    # Tracking de l'envoi (accusé de réception)
+    email_delivery_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, sent, failed, not_requested
+    whatsapp_delivery_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, sent, failed, not_requested
+    delivery_error_log: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

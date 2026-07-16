@@ -7,7 +7,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,28 +161,55 @@ async def get_ticket_qr(
 @router.post("/resend")
 @limiter.limit("3/hour")
 async def resend_ticket(
-    request: Request, data: TicketResendRequest, db: AsyncSession = Depends(get_db)
+    request: Request,
+    data: TicketResendRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
 ):
-    """Re-envoi d'un billet à un acheteur ayant perdu son email/WA.
+    """Re-envoi d'un billet à un acheteur ayant perdu son email/WA."""
+    ref_input = data.order_id.strip().lower()
+    
+    order = None
+    participant = None
+    event = None
+    formula = None
 
-    L'envoi effectif via Brevo/OpenWA est branché au Sprint 6.
-    """
+    # Chercher d'abord par UUID complet
     try:
-        parsed = uuid.UUID(data.order_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="order_id invalide")
+        parsed = uuid.UUID(ref_input)
+        result = await db.execute(
+            select(Order, Participant, Event, Formula)
+            .join(Participant, Participant.id == Order.participant_id)
+            .join(Event, Event.id == Order.event_id)
+            .join(Formula, Formula.id == Order.formula_id)
+            .where(Order.id == parsed)
+            .where(Participant.email == data.email)
+        )
+        row = result.first()
+        if row:
+            order, participant, event, formula = row
+    except ValueError:
+        pass
 
-    result = await db.execute(
-        select(Order, Participant)
-        .join(Participant, Participant.id == Order.participant_id)
-        .where(Order.id == parsed)
-        .where(Participant.email == data.email)
-    )
-    row = result.first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Commande introuvable pour cet email")
+    # Si non trouvé, on cherche avec la référence courte (8 derniers caractères) via les tickets ou la commande
+    if not order:
+        from sqlalchemy import cast, String
+        # Chercher par ticket short ref
+        result = await db.execute(
+            select(Order, Participant, Event, Formula)
+            .join(Ticket, Ticket.order_id == Order.id)
+            .join(Participant, Participant.id == Order.participant_id)
+            .join(Event, Event.id == Order.event_id)
+            .join(Formula, Formula.id == Order.formula_id)
+            .where(cast(Ticket.id, String).ilike(f"%{ref_input}"))
+            .where(Participant.email == data.email)
+        )
+        row = result.first()
+        if row:
+            order, participant, event, formula = row
 
-    order, participant = row
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable pour cet email ou cette référence")
 
     if order.status not in (OrderStatus.PAID.value, OrderStatus.MANUAL_VALIDATED.value):
         raise HTTPException(
@@ -198,9 +225,14 @@ async def resend_ticket(
             detail="Aucun billet trouvé pour cette commande — contactez le support",
         )
 
-    # TODO Sprint 6 : appeler brevo_service.send_ticket() + openwa_service.send_ticket()
+    from app.services.ticket_service import ticket_service
+    background_tasks.add_task(
+        ticket_service.send_tickets_bg,
+        str(order.id)
+    )
+
     return {
-        "message": f"Renvoi programmé vers {participant.email}",
+        "message": f"Renvoi programmé vers {participant.email} et {participant.whatsapp}",
         "tickets_count": len(tickets),
         "channels": ["email", "whatsapp"],
     }

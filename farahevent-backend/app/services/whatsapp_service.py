@@ -10,8 +10,9 @@ class WhatsAppService:
     def __init__(self):
         self.api_url = settings.OPENWA_API_URL
         self.api_key = settings.OPENWA_API_KEY
+        self.session_id = settings.WHATSAPP_SENDER
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "x-api-key": self.api_key,
             "Content-Type": "application/json",
         }
         # Client HTTP partagé : réutilise le pool de connexions TCP au lieu d'en
@@ -33,7 +34,7 @@ class WhatsAppService:
         phone_normalized = self._normalize_phone(phone)
         response = await self._get_client().post(
             f"{self.api_url}/api/sendText",
-            json={"to": f"{phone_normalized}@c.us", "content": message},
+            json={"chatId": f"{phone_normalized}@c.us", "text": message, "session": self.session_id},
             headers=self.headers,
         )
         response.raise_for_status()
@@ -45,10 +46,12 @@ class WhatsAppService:
         response = await self._get_client().post(
             f"{self.api_url}/api/sendImage",
             json={
-                "to": f"{phone_normalized}@c.us",
+                "chatId": f"{phone_normalized}@c.us",
                 "base64": image_base64,
                 "filename": "billet_farahevent.png",
                 "caption": caption,
+                "mimetype": "image/png",
+                "session": self.session_id
             },
             headers=self.headers,
         )
@@ -77,18 +80,18 @@ class WhatsAppService:
         try:
             # Message de confirmation
             message = (
-                f"🎉 *Confirmation de votre billet — FarahEvent*\n\n"
-                f"Bonjour {buyer_name} !\n\n"
-                f"Votre paiement a été confirmé. Voici votre billet :\n\n"
-                f"📅 *Événement :* {event_title}\n"
-                f"🗓️ *Date :* {event_date}\n"
-                f"📍 *Lieu :* {event_venue}\n"
-                f"🎫 *Catégorie :* {ticket_category}\n"
-                f"💰 *Montant payé :* {int(amount):,} FCFA\n"
-                f"🔖 *Référence :* {ticket_id[-8:].upper()}\n\n"
-                f"Votre QR code est joint à ce message.\n"
-                f"Présentez-le à l'entrée pour accéder à l'événement.\n\n"
-                f"⚠️ Ce billet est personnel et non transférable."
+                f"🎉 *Félicitations {buyer_name} !*\n"
+                f"Votre billet est confirmé avec succès. 🚀\n\n"
+                f"📌 *Détails de l'événement*\n"
+                f"✨ {event_title}\n"
+                f"📅 Date : {event_date}\n"
+                f"📍 Lieu : {event_venue}\n"
+                f"🎟️ Formule : {ticket_category}\n"
+                f"💳 Montant payé : {int(amount):,} FCFA\n"
+                f"🔖 Réf. : {ticket_id[-8:].upper()}\n\n"
+                f"📱 *Votre QR Code d'accès est joint à ce message.*\n"
+                f"Veuillez le présenter à l'entrée.\n\n"
+                f"⚠️ _Ce billet est personnel et non transférable._"
             )
 
             # Ajouter le lien stream si disponible
