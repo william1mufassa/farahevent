@@ -1,12 +1,13 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, events, tickets, orders, payments, webhooks, ws
+from app.api.v1.endpoints import auth, events, tickets, orders, payments, webhooks, ws, live
 from app.api.v1.endpoints.admin import (
     admins,
     audit_logs,
     chatbot_faqs,
     cms,
     dashboard,
+    database,
     email_automations,
     event_draft,
     events as admin_events,
@@ -28,6 +29,7 @@ api_router.include_router(tickets.router, prefix="/tickets", tags=["Billets"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Paiements"])
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 api_router.include_router(ws.router, prefix="/ws", tags=["WebSocket (temps réel)"])
+api_router.include_router(live.router, prefix="/live", tags=["Live"])
 
 # --- Admin — auth
 api_router.include_router(auth.router, prefix="/admin/auth", tags=["Admin · Auth"])
@@ -52,6 +54,9 @@ api_router.include_router(
 )
 api_router.include_router(
     audit_logs.router, prefix="/admin/audit-logs", tags=["Admin · Audit trail"]
+)
+api_router.include_router(
+    database.router, prefix="/admin", tags=["Admin · Base de données"]
 )
 # ⚠ APRÈS admin_events : la route générique PATCH /events/{id}/{section} ne doit pas
 # court-circuiter /events/{id}/status ni /events/{id} (garde de transition de statut).
