@@ -1,8 +1,31 @@
 """Réconciliation des paiements PENDING orphelins (filet anti-webhook-manqué)."""
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+import pytest
 
 from app.services.reconciliation_service import reconcile_pending_orders
 from tests.factories import make_event, make_formula, make_order, make_participant
+
+
+@pytest.fixture(autouse=True)
+def _no_real_delivery():
+    """Neutralise la livraison des billets pendant ces tests.
+
+    `reconcile_pending_orders` lance `send_tickets_bg` en fire-and-forget
+    (`asyncio.create_task`). Sans ce mock, la tâche s'échappe du test et
+    appelle le **vrai** serveur OpenWA de production (wa.farahevent.tech), puis
+    touche la base hors du contexte de session (MissingGreenlet). Ces tests
+    portent sur la réconciliation, pas sur la livraison.
+
+    ⚠ Le mock masque un défaut réel, à traiter en T3.10 : la tâche est créée
+    AVANT le commit de la transaction. Si elle gagne la course, `send_tickets_bg`
+    ouvre sa propre session, ne voit aucun billet et sort sur `if not tickets:
+    return` — le client paie et ne reçoit jamais rien, sans trace. La référence
+    de la tâche n'est pas conservée non plus (risque de GC en plein vol).
+    """
+    with patch("app.services.ticket_service.TicketService.send_tickets_bg"):
+        yield
 
 
 class _FakeProvider:
@@ -59,9 +82,14 @@ async def test_reconcile_robustness_on_ticket_error(db):
                          checkout_id="PAID-success-ticket", created_at=now - timedelta(minutes=10))
     await db.commit()
 
+    # Capturé AVANT le patch : l'échec sur `a` fait rollback son savepoint, ce qui
+    # EXPIRE l'instance `a`. Relire `a.id` depuis la closure au tour suivant (ordre
+    # `b`) déclencherait un lazy-load async hors greenlet => MissingGreenlet.
+    a_id = a.id
+
     original_generate = ticket_service.generate_for_order
     async def mock_generate(order, session):
-        if order.id == a.id:
+        if order.id == a_id:
             raise TicketGenerationError("Simulated error")
         return await original_generate(order, session)
 

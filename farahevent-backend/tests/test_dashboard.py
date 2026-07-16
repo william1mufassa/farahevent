@@ -26,7 +26,9 @@ async def test_stats_kpis_and_sales(client, db, auth_as):
     assert body["kpis"]["tickets_sold"] == 2
     assert body["kpis"]["revenue"] == 2000
     assert body["kpis"]["currency"] == "XOF"
-    assert body["kpis"]["live_viewers"] is None
+    # 0 (et non None) depuis que le live_hub compte les viewers réels : aucune
+    # socket connectée en test => 0.
+    assert body["kpis"]["live_viewers"] == 0
     assert body["sales_by_formula"] == [{"formula": "Std", "count": 2}]
 
 

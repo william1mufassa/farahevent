@@ -5,8 +5,8 @@ Contrats consommés par le frontend (getDashboardStats / getAdminNotifications) 
 - GET /admin/notifications                        → AdminNotification[]
 
 Les KPIs et ventilations sont tout-temps (filtrés par événement si event_id) ;
-seule la série de revenus dépend de la période. `live_viewers` reste null tant que
-le streaming (v2) n'est pas branché.
+seule la série de revenus dépend de la période. `live_viewers` est le nombre de
+sockets connectées au live_hub (0 si aucune) — jamais null.
 """
 import uuid
 from datetime import datetime, timedelta, timezone
