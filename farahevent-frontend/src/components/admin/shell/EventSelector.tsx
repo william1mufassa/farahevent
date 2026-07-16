@@ -25,16 +25,16 @@ export function EventSelector() {
         value={selectedEventId ?? ''}
         onChange={(e) => setSelectedEvent(e.target.value || null)}
         aria-label="Événement"
-        className="h-9 w-40 appearance-none truncate rounded-md border border-input bg-background pl-3 pr-8 text-sm font-medium outline-none transition focus:ring-2 focus:ring-ring/40 sm:w-56"
+        className="h-9 w-40 appearance-none truncate rounded-xl border border-white/20 bg-white/60 pl-3 pr-8 text-xs font-semibold uppercase tracking-wider text-muted-foreground outline-none transition-all duration-300 hover:bg-white/80 hover:text-foreground focus:ring-2 focus:ring-primary/20 dark:border-slate-800/40 dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:focus:ring-primary/20 sm:w-56"
       >
         <option value="">Tous les événements</option>
         {events?.map((e) => (
-          <option key={e.id} value={e.id}>
+          <option key={e.id} value={e.id} className="text-foreground dark:bg-[#070b13]">
             {e.name}
           </option>
         ))}
       </select>
-      <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   );
 }

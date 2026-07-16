@@ -30,7 +30,7 @@ async def list_events(db: AsyncSession = Depends(get_db)):
     """Liste publique des événements ouverts / en live / clos."""
     result = await db.execute(
         select(Event)
-        .where(Event.is_deleted.is_(False))
+        .where(Event.is_deleted == False)
         .where(Event.status.in_(_PUBLIC_STATUSES))
         .order_by(Event.date.asc())
     )
@@ -270,7 +270,7 @@ async def _load_public_event(db: AsyncSession, slug: str) -> Event:
     result = await db.execute(
         select(Event)
         .where(Event.slug == slug)
-        .where(Event.is_deleted.is_(False))
+        .where(Event.is_deleted == False)
     )
     event = result.scalar_one_or_none()
     if not event or event.status not in _PUBLIC_STATUSES:

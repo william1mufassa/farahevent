@@ -5,6 +5,7 @@ import { sanitizeRichText } from '@/lib/sanitize';
 import type { TemplateSectionProps } from '../types';
 import { SECTION_IDS } from '../types';
 import { SectionHeader } from './SectionHeader';
+import { TeaserPlayer } from '@/components/shared/TeaserPlayer';
 
 export function SpotlightAbout({ config, locale }: TemplateSectionProps) {
   const t = useTranslations('landing');
@@ -24,10 +25,13 @@ export function SpotlightAbout({ config, locale }: TemplateSectionProps) {
         )}
 
         <ScrollReveal className={tagline ? 'lg:col-span-3' : 'lg:col-span-5 mx-auto max-w-3xl'}>
-          <div
-            className="space-y-4 text-base leading-relaxed opacity-85 [&_a]:text-[var(--color-primary)] [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
-          />
+          <div className="space-y-6">
+            <div
+              className="space-y-4 text-base leading-relaxed opacity-85 [&_a]:text-[var(--color-primary)] [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
+            />
+            <TeaserPlayer url={config.content.teaser_video_url} />
+          </div>
         </ScrollReveal>
       </div>
     </section>

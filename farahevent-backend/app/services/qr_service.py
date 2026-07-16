@@ -17,6 +17,8 @@ from io import BytesIO
 from typing import TypedDict
 
 import qrcode
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from jose import JWTError, jwt
 
 from app.core.config import settings
@@ -74,12 +76,20 @@ class QRService:
         qr = qrcode.QRCode(
             version=None,  # taille auto
             error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
-            border=4,
+            box_size=12,
+            border=3,
         )
         qr.add_data(content)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="#1a1a2e", back_color="white")
+        img = qr.make_image(
+            image_factory=StyledPilImage,
+            module_drawer=RoundedModuleDrawer(),
+            color_mask=qrcode.image.styles.colormasks.RadialGradiantColorMask(
+                back_color=(255, 255, 255),
+                center_color=(79, 70, 229), # Indigo 600
+                edge_color=(17, 24, 39)    # Gray 900
+            ),
+        )
 
         buffer = BytesIO()
         img.save(buffer, format="PNG")

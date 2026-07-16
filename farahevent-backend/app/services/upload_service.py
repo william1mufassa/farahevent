@@ -67,8 +67,9 @@ class UploadService:
         filename = f"{uuid.uuid4().hex}.{ext}"
         target_path = target_dir / filename
 
-        with open(target_path, "wb") as fh:
-            fh.write(content)
+        import anyio
+
+        await anyio.to_thread.run_sync(lambda: target_path.write_bytes(content))
 
         # Clé de stockage RELATIVE à UPLOAD_DIR (et non une URL publique) : les reçus
         # contiennent des données financières et ne sont servis que via la route admin

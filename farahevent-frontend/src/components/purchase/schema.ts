@@ -6,7 +6,7 @@ import { findCountry } from '@/lib/data/countries';
  * Les messages d'erreur sont injectés (next-intl) pour rester localisés.
  */
 
-export const DIGITAL_METHODS = ['wave', 'orange_money', 'mtn', 'card'] as const;
+export const DIGITAL_METHODS = ['mobile_money', 'card'] as const;
 export const MANUAL_OPERATORS = ['western_union', 'ria', 'moneygram', 'other'] as const;
 
 export type DigitalMethod = (typeof DIGITAL_METHODS)[number];
@@ -14,9 +14,7 @@ export type ManualOperator = (typeof MANUAL_OPERATORS)[number];
 
 /** Libellés d'affichage des moyens de paiement (marques — non traduits). */
 export const DIGITAL_METHOD_LABELS: Record<DigitalMethod, string> = {
-  wave: 'Wave',
-  orange_money: 'Orange Money',
-  mtn: 'MTN MoMo',
+  mobile_money: 'Paiement mobile',
   card: 'Carte Visa / Mastercard',
 };
 

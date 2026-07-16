@@ -25,6 +25,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     otp_code: str | None = Field(None, min_length=6, max_length=6, pattern=r"^\d{6}$")
+    turnstile_token: str = ""
 
 
 class RefreshRequest(BaseModel):
@@ -42,9 +43,15 @@ class TwoFactorRequired(BaseModel):
     detail: str = "2fa_required"
 
 
+from app.services.turnstile_service import turnstile_service
+
 @router.post("/login", response_model=TokenResponse, responses={202: {"model": TwoFactorRequired}})
 @limiter.limit("5/15minutes")
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
+    client_ip = request.client.host if request.client else None
+    if not await turnstile_service.verify(data.turnstile_token, client_ip):
+        raise HTTPException(status_code=400, detail="Vérification anti-robot échouée. Réessayez.")
+
     result = await db.execute(select(Admin).where(Admin.email == data.email))
     admin = result.scalar_one_or_none()
 

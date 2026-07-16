@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   CreditCard,
+  Database,
   LayoutDashboard,
   type LucideIcon,
   Megaphone,
@@ -34,6 +35,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: '/admin/communications', label: 'Communications', icon: Megaphone, roles: ['super_admin', 'manager'] },
   { href: '/admin/equipe', label: 'Équipe', icon: Users, roles: ['super_admin'] },
   { href: '/admin/activite', label: 'Activité', icon: ScrollText, roles: ['super_admin'] },
+  { href: '/admin/base-de-donnees', label: 'Maintenance', icon: Database, roles: ['super_admin'] },
 ];
 
 export function navForRole(role: AdminRole): NavItem[] {

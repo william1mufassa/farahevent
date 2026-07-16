@@ -49,6 +49,8 @@ def _to_out(e: Event) -> EventAdminOut:
         is_featured=e.is_featured,
         is_deleted=e.is_deleted,
         created_at=e.created_at,
+        stream_key=e.stream_key,
+        stream_hls_url=e.stream_hls_url,
     )
 
 
@@ -60,7 +62,7 @@ async def list_events_admin(
 ):
     stmt = select(Event).order_by(Event.date.desc())
     if not include_deleted:
-        stmt = stmt.where(Event.is_deleted.is_(False))
+        stmt = stmt.where(Event.is_deleted == False)
     result = await db.execute(stmt)
     return [_to_out(e) for e in result.scalars().all()]
 

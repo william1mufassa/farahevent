@@ -32,9 +32,11 @@ export interface EventDraftGeneral {
 
 export interface EventDraftContent {
   hero_image_url: string;
+  hero_video_url: string | null;
   /** Rich text HTML restreint (Tiptap). */
   description: Bilingual;
   tagline: Bilingual;
+  teaser_video_url: string | null;
   cta_presentiel: Bilingual;
   cta_online: Bilingual;
 }

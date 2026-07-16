@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { useAdminUi } from '@/stores/useAdminUi';
 import { useNotifications } from '@/stores/useNotifications';
@@ -20,6 +22,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const theme = useAdminUi((s) => s.theme);
+  const collapsed = useAdminUi((s) => s.sidebarCollapsed);
+  const toggleSidebar = useAdminUi((s) => s.toggleSidebar);
   const setAll = useNotifications((s) => s.setAll);
   const prepend = useNotifications((s) => s.prepend);
 
@@ -86,11 +90,38 @@ function Shell({ children }: { children: React.ReactNode }) {
   if (!admin) return null;
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50 text-foreground dark:bg-[#070b13] transition-colors duration-500">
+      {/* Background Liquid Light Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -left-[10%] -top-[10%] h-[50%] w-[50%] rounded-full bg-indigo-500/10 blur-[120px] dark:bg-indigo-600/5" />
+        <div className="absolute -right-[10%] -bottom-[10%] h-[60%] w-[60%] rounded-full bg-cyan-500/10 blur-[130px] dark:bg-cyan-600/5 animate-pulse duration-[8s]" />
+        <div className="absolute left-[30%] top-[40%] h-[30%] w-[30%] rounded-full bg-purple-500/10 blur-[110px] dark:bg-purple-600/5" />
+      </div>
+
       <Topbar />
-      <div className="flex flex-1 overflow-hidden">
+      
+      <div className="relative flex flex-1 overflow-hidden z-10">
+        {/* Mobile backdrop */}
+        {!collapsed && (
+          <div 
+            className="absolute inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
+            onClick={toggleSidebar}
+          />
+        )}
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-4 sm:p-6 lg:p-8">{children}</main>
+        
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-transparent"
+          >
+            {children}
+          </motion.main>
+        </AnimatePresence>
       </div>
     </div>
   );

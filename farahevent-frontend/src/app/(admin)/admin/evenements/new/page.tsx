@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -30,6 +30,7 @@ interface EventForm {
 
 export default function NewEventPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EventForm>({
     defaultValues: { mode: 'presentiel', template: 'A' },
   });
@@ -52,8 +53,10 @@ export default function NewEventPage() {
       return (await adminApi.post<EventAdmin>('/admin/events/', body)).data;
     },
     onSuccess: (evt) => {
-      toast.success('Evenement cree.');
-      router.push(`/admin/evenements/${evt.id}`);
+      toast.success('Événement créé.');
+      // Invalider le cache pour mise à jour instantanée de la liste
+      qc.invalidateQueries({ queryKey: ['admin', 'events'] });
+      router.push(`/admin/evenements?new_draft=${evt.id}&draft_name=${encodeURIComponent(evt.name)}`);
     },
     onError: (e) => toast.error(toApiError(e).message),
   });
@@ -114,8 +117,10 @@ export default function NewEventPage() {
                   {...register('template')}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="A">A - Sobre</option>
-                  <option value="B">B - Festif</option>
+                  <option value="A">{"A - Sobre (Keynote)"}</option>
+                  <option value="B">{"B - Festif (Spotlight)"}</option>
+                  <option value="C">{"C - Cinématique (Director's Cut)"}</option>
+                  <option value="D">{"D - Kinétique (Pulse)"}</option>
                 </select>
               </div>
             </div>

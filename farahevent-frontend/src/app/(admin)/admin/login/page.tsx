@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 import { useAuth } from '@/contexts/auth';
 import type { AdminInfo } from '@/types/admin';
@@ -24,12 +25,15 @@ export default function AdminLoginPage() {
   const [otpCode, setOtpCode] = useState('');
   const [needs2FA, setNeeds2FA] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+
+  const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload: Record<string, string> = { email, password };
+      const payload: Record<string, string> = { email, password, turnstile_token: turnstileToken };
       if (needs2FA && otpCode) payload.otp_code = otpCode;
 
       const res = await fetch('/api/admin-session/login', {
@@ -108,6 +112,18 @@ export default function AdminLoginPage() {
                 />
               </div>
             )}
+            
+            {TURNSTILE_SITE_KEY && (
+              <div className="flex justify-center">
+                <Turnstile
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={() => setTurnstileToken('')}
+                />
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>

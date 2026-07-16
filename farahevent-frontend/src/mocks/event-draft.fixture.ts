@@ -21,8 +21,10 @@ export const MOCK_EVENT_DRAFT: EventDraft = {
   },
   content: {
     hero_image_url: MOCK_EVENT_CONFIG.content.hero_image_url,
+    hero_video_url: MOCK_EVENT_CONFIG.content.hero_video_url,
     description: MOCK_EVENT_CONFIG.content.description,
     tagline: MOCK_EVENT_CONFIG.content.tagline ?? { fr: '', en: '' },
+    teaser_video_url: MOCK_EVENT_CONFIG.content.teaser_video_url,
     cta_presentiel: MOCK_EVENT_CONFIG.content.cta_presentiel,
     cta_online: MOCK_EVENT_CONFIG.content.cta_online,
   },

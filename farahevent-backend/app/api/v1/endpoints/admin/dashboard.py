@@ -26,6 +26,7 @@ from app.models.order import Order
 from app.models.participant import Participant
 from app.models.ticket import Ticket
 from app.services.notification_hub import manual_payment_notification
+from app.api.v1.endpoints.ws import live_hub
 
 router = APIRouter()
 
@@ -85,12 +86,19 @@ async def dashboard_stats(
         )
     pending_manual = (await db.execute(pm_stmt)).scalar_one()
 
+    # --- Viewers (Live) ---
+    viewers = 0
+    if ev:
+        viewers = live_hub.get_viewer_count(str(ev))
+    else:
+        viewers = sum(len(conns) for conns in live_hub.active_connections.values())
+
     kpis = {
         "tickets_sold": int(tickets_sold or 0),
         "scans": int(scans or 0),
         "revenue": float(revenue or 0),
         "currency": "XOF",
-        "live_viewers": None,  # streaming reporté (v2)
+        "live_viewers": viewers,
         "pending_manual": int(pending_manual or 0),
     }
 

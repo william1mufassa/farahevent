@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { useMotionProfile } from '@/lib/motion/useMotionProfile';
 
 /**
@@ -10,44 +11,71 @@ import { useMotionProfile } from '@/lib/motion/useMotionProfile';
  */
 export function CustomCursor() {
   const profile = useMotionProfile();
-  const dotRef = useRef<HTMLDivElement>(null);
   const [enabled, setEnabled] = useState(false);
+  const [cursorType, setCursorType] = useState<string>('default');
+
+  const cursorX = useMotionValue(-100);
+  const cursorY = useMotionValue(-100);
+
+  const springConfig = { stiffness: 400, damping: 28 };
+  const cursorXSpring = useSpring(cursorX, springConfig);
+  const cursorYSpring = useSpring(cursorY, springConfig);
 
   useEffect(() => setEnabled(profile === 'full'), [profile]);
 
   useEffect(() => {
     if (!enabled) return;
-    const dot = dotRef.current;
-    if (!dot) return;
-    let x = window.innerWidth / 2;
-    let y = window.innerHeight / 2;
-    let tx = x;
-    let ty = y;
-    let raf = 0;
-    const move = (e: MouseEvent) => {
-      tx = e.clientX;
-      ty = e.clientY;
+
+    const moveCursor = (e: MouseEvent) => {
+      cursorX.set(e.clientX);
+      cursorY.set(e.clientY);
     };
-    const loop = () => {
-      x += (tx - x) * 0.18;
-      y += (ty - y) * 0.18;
-      dot.style.transform = `translate(${x}px, ${y}px)`;
-      raf = requestAnimationFrame(loop);
+
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      
+      const element = target.closest('[data-cursor]') as HTMLElement | null;
+      if (element) {
+        const type = element.getAttribute('data-cursor');
+        setCursorType(type || 'default');
+      } else {
+        setCursorType('default');
+      }
     };
-    window.addEventListener('mousemove', move);
-    raf = requestAnimationFrame(loop);
+
+    window.addEventListener('mousemove', moveCursor);
+    document.addEventListener('mouseover', handleMouseOver);
+
     return () => {
-      window.removeEventListener('mousemove', move);
-      cancelAnimationFrame(raf);
+      window.removeEventListener('mousemove', moveCursor);
+      document.removeEventListener('mouseover', handleMouseOver);
     };
-  }, [enabled]);
+  }, [enabled, cursorX, cursorY]);
 
   if (!enabled) return null;
+
+  // Custom styling states
+  const size = cursorType === 'default' ? 20 : 64;
+  const label = 
+    cursorType === 'view' ? 'VOIR' :
+    cursorType === 'go' ? 'GO' :
+    cursorType === 'left' ? '←' :
+    cursorType === 'right' ? '→' : '';
+
   return (
-    <div
-      ref={dotRef}
-      aria-hidden
-      className="pointer-events-none fixed left-0 top-0 z-[60] -ml-3 -mt-3 h-6 w-6 rounded-full bg-[var(--color-primary)] mix-blend-difference"
-    />
+    <motion.div
+      style={{
+        translateX: cursorXSpring,
+        translateY: cursorYSpring,
+        x: '-50%',
+        y: '-50%',
+        width: size,
+        height: size,
+      }}
+      className="pointer-events-none fixed left-0 top-0 z-[100] flex items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-extrabold uppercase tracking-wider text-white mix-blend-difference transition-all duration-200"
+    >
+      {label}
+    </motion.div>
   );
 }

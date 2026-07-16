@@ -49,6 +49,9 @@ pnpm-debug.log*
 farahevent-backend/uploads/*
 !farahevent-backend/uploads/.gitkeep
 
+# Knowledge graph graphify (artefact local, ~4 Mo, régénérable via `graphify update .`)
+graphify-out/
+
 # Coverage / tests
 htmlcov/
 .coverage
@@ -61,3 +64,7 @@ farahevent-backend/alembic/versions/__pycache__/
 
 # Claude Code local
 .claude/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

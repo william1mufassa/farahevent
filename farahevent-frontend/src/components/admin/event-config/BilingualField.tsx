@@ -25,9 +25,9 @@ export function BilingualField({
   placeholder?: string;
 }) {
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
-  const current = lang === 'fr' ? value.fr : (value.en ?? '');
+  const current = lang === 'fr' ? (value?.fr ?? '') : (value?.en ?? '');
   const set = (text: string) =>
-    onChange(lang === 'fr' ? { ...value, fr: text } : { ...value, en: text });
+    onChange(lang === 'fr' ? { ...(value || {}), fr: text } : { ...(value || {}), en: text });
   const ph = lang === 'en' ? (placeholder ?? 'Laisser vide = hérite du FR') : placeholder;
 
   return (

@@ -22,7 +22,15 @@ async function handler(request: NextRequest) {
   }
 
   // Chemin relatif exact (slash final compris — FastAPI y est sensible).
-  const upstreamPath = request.nextUrl.pathname.replace(/^\/api\/proxy\//, '');
+  let upstreamPath = request.nextUrl.pathname.replace(/^\/api\/proxy\//, '');
+  
+  // Évite le redirect 307 de FastAPI sur les collections (surtout pour POST avec body)
+  const tokens = upstreamPath.split('/');
+  const last = tokens[tokens.length - 1];
+  if (['events', 'admins', 'audit-logs'].includes(last)) {
+    upstreamPath += '/';
+  }
+
   const url = `${API_URL}/${upstreamPath}${request.nextUrl.search}`;
 
   const access = request.cookies.get(ACCESS_COOKIE)?.value ?? null;
@@ -47,6 +55,11 @@ async function handler(request: NextRequest) {
 
   const toResponse = async (upstream: Response): Promise<NextResponse> => {
     const buf = await upstream.arrayBuffer();
+    // Les réponses 204 (No Content) ne peuvent pas avoir de corps dans Next.js,
+    // sinon NextResponse lance une erreur 500 en interne.
+    if (upstream.status === 204) {
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
     return new NextResponse(buf, {
       status: upstream.status,
       headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },

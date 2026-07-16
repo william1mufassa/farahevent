@@ -5,6 +5,7 @@ import { sanitizeRichText } from '@/lib/sanitize';
 import type { TemplateSectionProps } from '../types';
 import { SECTION_IDS } from '../types';
 import { SectionTitle } from './SectionTitle';
+import { TeaserPlayer } from '@/components/shared/TeaserPlayer';
 
 /** À propos PULSE : accroche display + texte haute lisibilité. */
 export function PulseAbout({ config, locale }: TemplateSectionProps) {
@@ -24,10 +25,13 @@ export function PulseAbout({ config, locale }: TemplateSectionProps) {
             </ScrollReveal>
           )}
           <ScrollReveal>
-            <div
-              className="space-y-4 text-base leading-relaxed opacity-80 [&_a]:text-[var(--color-primary)] [&_a]:underline"
-              dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
-            />
+            <div className="space-y-6">
+              <div
+                className="space-y-4 text-base leading-relaxed opacity-80 [&_a]:text-[var(--color-primary)] [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
+              />
+              <TeaserPlayer url={config.content.teaser_video_url} />
+            </div>
           </ScrollReveal>
         </div>
       </div>

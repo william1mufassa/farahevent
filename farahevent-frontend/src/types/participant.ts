@@ -24,6 +24,8 @@ export interface ParticipantRow {
   created_at: string;
   /** Entré sur site (billet scanné). */
   scanned: boolean;
+  email_delivery_status: 'pending' | 'sent' | 'failed' | 'not_requested';
+  whatsapp_delivery_status: 'pending' | 'sent' | 'failed' | 'not_requested';
 }
 
 export interface ParticipantsQuery {

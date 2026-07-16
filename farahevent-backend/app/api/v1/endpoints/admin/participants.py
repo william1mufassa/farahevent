@@ -105,9 +105,15 @@ async def list_participants(
     scanned_col = (
         exists().where((Ticket.order_id == Order.id) & (Ticket.is_scanned.is_(True))).label("scanned")
     )
+    email_status_col = (
+        select(func.max(Ticket.email_delivery_status)).where(Ticket.order_id == Order.id).scalar_subquery().label("email_status")
+    )
+    wa_status_col = (
+        select(func.max(Ticket.whatsapp_delivery_status)).where(Ticket.order_id == Order.id).scalar_subquery().label("wa_status")
+    )
 
     joined = (
-        select(Order, Participant, Formula, scanned_col)
+        select(Order, Participant, Formula, scanned_col, email_status_col, wa_status_col)
         .join(Participant, Participant.id == Order.participant_id)
         .join(Formula, Formula.id == Order.formula_id)
     )
@@ -128,7 +134,7 @@ async def list_participants(
     joined = joined.limit(pageSize).offset((page - 1) * pageSize)
 
     rows = []
-    for order, participant, formula_obj, is_scanned in (await db.execute(joined)).all():
+    for order, participant, formula_obj, is_scanned, email_status, wa_status in (await db.execute(joined)).all():
         payment_mode = (order.metadata_ or {}).get("payment_mode") or (
             "manual" if order.payment_provider == "manual" else "digital"
         )
@@ -150,6 +156,8 @@ async def list_participants(
                 "currency": order.currency,
                 "created_at": order.created_at.isoformat(),
                 "scanned": bool(is_scanned),
+                "email_delivery_status": email_status or "pending",
+                "whatsapp_delivery_status": wa_status or "pending",
             }
         )
 

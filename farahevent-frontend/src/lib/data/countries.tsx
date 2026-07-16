@@ -15,11 +15,15 @@ export interface Country {
 
 export const DEFAULT_COUNTRY_ISO = 'CI';
 
-/** Drapeau emoji dérivé du code ISO (indicateurs régionaux Unicode). */
-export function flagEmoji(iso: string): string {
-  return iso
-    .toUpperCase()
-    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+/** Drapeau emoji ou image pour Windows (via flagcdn). */
+export function Flag({ iso, className }: { iso: string; className?: string }) {
+  return (
+    <img
+      src={`https://flagcdn.com/w20/${iso.toLowerCase()}.png`}
+      alt={iso}
+      className={`inline-block h-[15px] w-[20px] rounded-[2px] object-cover ${className || ''}`}
+    />
+  );
 }
 
 export function findCountry(iso: string): Country | undefined {

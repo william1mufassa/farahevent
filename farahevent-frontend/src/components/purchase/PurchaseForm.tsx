@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,12 +15,15 @@ import { SOFT_BORDER } from '@/lib/styles';
 import { DEFAULT_COUNTRY_ISO, findCountry } from '@/lib/data/countries';
 import type { EventConfig } from '@/types/event-config';
 import type { OrderCreateRequest, OrderCreateResponse } from '@/types/order';
+import { formatLongDate } from '@/lib/utils';
+import { l } from '@/lib/localized';
 
 import { FormulaPicker } from './FormulaPicker';
 import { PersonalInfoFields } from './PersonalInfoFields';
 import { PaymentPicker } from './PaymentPicker';
 import { OrderRecap } from './OrderRecap';
 import { TurnstileField } from './TurnstileField';
+import { Ticket3DPreview } from './Ticket3DPreview';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   assembleWhatsapp,
@@ -51,6 +54,7 @@ export function PurchaseForm({
   const t = useTranslations('purchase');
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [currentStep, setCurrentStep] = useState(1);
 
   const formulas = useMemo(
     () =>
@@ -99,7 +103,7 @@ export function PurchaseForm({
       city: '',
       ticket_delivery_pref: 'both',
       payment_mode: digitalEnabled ? 'digital' : 'manual',
-      digital_method: 'wave',
+      digital_method: 'mobile_money',
       manual_operator: 'western_union',
       turnstile_token: '',
     },
@@ -153,6 +157,9 @@ export function PurchaseForm({
   const paymentMode = form.watch('payment_mode');
   const digitalMethod = form.watch('digital_method');
   const manualOperator = form.watch('manual_operator');
+  const firstName = form.watch('first_name') || '';
+  const lastName = form.watch('last_name') || '';
+  
   const selectedFormula = formulas.find((f) => f.id === formulaId) ?? null;
   const paymentLabel =
     paymentMode === 'digital'
@@ -163,47 +170,170 @@ export function PurchaseForm({
         ? MANUAL_OPERATOR_LABELS[manualOperator]
         : '';
 
+  const nextStep = async () => {
+    let isValid = false;
+    if (currentStep === 1) {
+      isValid = await form.trigger(['formula_id']);
+    } else if (currentStep === 2) {
+      isValid = await form.trigger([
+        'first_name',
+        'last_name',
+        'email',
+        'phone_national',
+        'country',
+        'city',
+        'ticket_delivery_pref',
+      ]);
+    }
+    
+    if (isValid) {
+      setCurrentStep(s => Math.min(s + 1, 3));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(s => Math.max(s - 1, 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <FormProvider {...form}>
-      <form onSubmit={onSubmit} className="space-y-10" noValidate>
-        <StepBlock index={1} title={t('step1')}>
-          <FormulaPicker
-            formulas={formulas}
-            locale={locale}
-            showCounter={config.options.show_tickets_counter}
-          />
-          {channel === 'online' && (
-            <Alert variant="info" className="mt-4">
-              <AlertDescription>{t('onlineNotice')}</AlertDescription>
-            </Alert>
+      <div className="grid gap-12 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+        <form onSubmit={onSubmit} className="space-y-10" noValidate>
+          
+          {/* Progress Bar */}
+          <div className="flex items-center justify-between mb-8 relative">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/10 rounded-full" />
+            <div 
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-[var(--color-primary)] rounded-full transition-all duration-300"
+              style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
+            />
+            {[1, 2, 3].map((step) => (
+              <div 
+                key={step}
+                className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                  currentStep >= step 
+                    ? 'bg-[var(--color-primary)] text-white' 
+                    : 'bg-zinc-800 text-zinc-500 border border-white/10'
+                }`}
+              >
+                {step}
+              </div>
+            ))}
+          </div>
+
+          {currentStep === 1 && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <StepBlock index={1} title={t('step1')}>
+                <FormulaPicker
+                  formulas={formulas}
+                  locale={locale}
+                  showCounter={config.options.show_tickets_counter}
+                />
+                {channel === 'online' && (
+                  <Alert variant="info" className="mt-4">
+                    <AlertDescription>{t('onlineNotice')}</AlertDescription>
+                  </Alert>
+                )}
+              </StepBlock>
+              
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={nextStep}
+                  disabled={!formulaId}
+                  className="w-full rounded-md bg-[var(--color-primary)] px-6 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continuer
+                </button>
+              </div>
+            </div>
           )}
-        </StepBlock>
 
-        <StepBlock index={2} title={t('step2')}>
-          <PersonalInfoFields locale={locale} />
-        </StepBlock>
+          {currentStep === 2 && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <StepBlock index={2} title={t('step2')}>
+                <PersonalInfoFields locale={locale} />
+              </StepBlock>
+              
+              <div className="mt-8 flex gap-4">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="w-1/3 rounded-md border border-white/15 bg-transparent px-6 py-4 text-base font-semibold text-white transition hover:bg-white/5"
+                >
+                  Retour
+                </button>
+                <button
+                  type="button"
+                  onClick={nextStep}
+                  className="w-2/3 rounded-md bg-[var(--color-primary)] px-6 py-4 text-base font-semibold text-white transition hover:opacity-90"
+                >
+                  Continuer
+                </button>
+              </div>
+            </div>
+          )}
 
-        <StepBlock index={3} title={t('step3')}>
-          <PaymentPicker
-            digitalEnabled={digitalEnabled}
-            manualEnabled={manualEnabled}
-            paymentManual={config.payment_manual}
-            locale={locale}
-          />
-        </StepBlock>
+          {currentStep === 3 && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <StepBlock index={3} title={t('step3')}>
+                <PaymentPicker
+                  digitalEnabled={digitalEnabled}
+                  manualEnabled={manualEnabled}
+                  paymentManual={config.payment_manual}
+                  locale={locale}
+                />
+              </StepBlock>
 
-        <TurnstileField locale={locale} />
+              <TurnstileField locale={locale} />
 
-        <OrderRecap formula={selectedFormula} locale={locale} paymentLabel={paymentLabel} />
+              <OrderRecap
+                formula={selectedFormula}
+                locale={locale}
+                paymentLabel={paymentLabel}
+                paymentMode={paymentMode}
+                digitalMethod={digitalMethod}
+              />
 
-        <button
-          type="submit"
-          disabled={!form.formState.isValid || createOrder.isPending}
-          className="w-full rounded-md bg-[var(--color-primary)] px-6 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {createOrder.isPending ? t('processing') : t('payCta')}
-        </button>
-      </form>
+              <div className="mt-8 flex gap-4">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="w-1/3 rounded-md border border-white/15 bg-transparent px-6 py-4 text-base font-semibold text-white transition hover:bg-white/5 disabled:opacity-50"
+                  disabled={createOrder.isPending}
+                >
+                  Retour
+                </button>
+                <button
+                  type="submit"
+                  disabled={!form.formState.isValid || createOrder.isPending}
+                  className="w-2/3 rounded-md bg-[var(--color-primary)] px-6 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {createOrder.isPending ? t('processing') : t('payCta')}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
+
+        {/* Dynamic 3D Ticket Preview Column */}
+        <div className="sticky top-28 hidden lg:block space-y-6">
+          <div className="text-center p-6 rounded-2xl border border-white/10 backdrop-blur-md bg-white/5 shadow-xl">
+            <span className="text-xs uppercase tracking-[0.25em] opacity-60 block mb-6">Aperçu en direct de votre billet 3D</span>
+            <Ticket3DPreview
+              firstName={firstName}
+              lastName={lastName}
+              formula={selectedFormula}
+              eventName={l(config.event.name, locale)}
+              eventDate={formatLongDate(config.event.date, locale)}
+              locale={locale}
+            />
+            <p className="text-[10px] text-zinc-500 mt-6 uppercase tracking-wider">Cliquez sur le billet pour retourner la carte</p>
+          </div>
+        </div>
+      </div>
     </FormProvider>
   );
 }

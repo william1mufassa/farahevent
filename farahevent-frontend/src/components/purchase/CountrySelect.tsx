@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import { useTranslations } from 'next-intl';
 import { ChevronDown } from 'lucide-react';
-import { COUNTRIES, flagEmoji } from '@/lib/data/countries';
+import { COUNTRIES, Flag } from '@/lib/data/countries';
 import type { Locale } from '@/lib/i18n/routing';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,8 +70,15 @@ export function CountryCombobox({
     ? entries.filter((e) => e.name.toLowerCase().includes(query.trim().toLowerCase()))
     : entries;
 
+  const selectedEntry = entries.find((e) => e.name === value);
+
   return (
     <div className="relative">
+      {selectedEntry && !open && (
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base leading-none">
+          <Flag iso={selectedEntry.iso} />
+        </span>
+      )}
       <Input
         id={id}
         role="combobox"
@@ -85,7 +92,7 @@ export function CountryCombobox({
         }}
         onBlur={() => setOpen(false)}
         onChange={(e) => setQuery(e.target.value)}
-        className="pr-8"
+        className={selectedEntry && !open ? 'pr-8 pl-9' : 'pr-8'}
       />
       <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
 
@@ -111,7 +118,7 @@ export function CountryCombobox({
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
               >
-                <span aria-hidden>{flagEmoji(entry.iso)}</span>
+                <span aria-hidden><Flag iso={entry.iso} /></span>
                 {entry.name}
               </button>
             </li>

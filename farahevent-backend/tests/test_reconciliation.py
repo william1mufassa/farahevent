@@ -42,3 +42,44 @@ async def test_reconcile_resolves_orphans(db):
     }
     # Le paiement 'a' a bien émis une place.
     assert f.sold_quantity == 1
+
+
+from unittest.mock import patch
+from app.services.ticket_service import TicketGenerationError, ticket_service
+
+async def test_reconcile_robustness_on_ticket_error(db):
+    now = datetime.now(timezone.utc)
+    ev = await make_event(db)
+    f = await make_formula(db, ev, stock=100)
+    p = await make_participant(db)
+
+    a = await make_order(db, ev, f, p, status="PENDING", provider="fake",
+                         checkout_id="PAID-fail-ticket", created_at=now - timedelta(minutes=10))
+    b = await make_order(db, ev, f, p, status="PENDING", provider="fake",
+                         checkout_id="PAID-success-ticket", created_at=now - timedelta(minutes=10))
+    await db.commit()
+
+    original_generate = ticket_service.generate_for_order
+    async def mock_generate(order, session):
+        if order.id == a.id:
+            raise TicketGenerationError("Simulated error")
+        return await original_generate(order, session)
+
+    with patch("app.services.reconciliation_service.ticket_service.generate_for_order", mock_generate):
+        counts = await reconcile_pending_orders(db, provider=_FakeProvider(), now=now)
+        await db.commit()
+
+    await db.refresh(a)
+    await db.refresh(b)
+    await db.refresh(f)
+
+    # L'ordre 'a' a échoué (savepoint annulé) -> son statut reste PENDING
+    assert a.status == "PENDING"
+    # L'ordre 'b' a réussi -> son statut est PAID
+    assert b.status == "PAID"
+    # Comptes : 2 traités, 1 payé (b), 1 still_pending (a)
+    assert counts == {
+        "checked": 2, "paid": 1, "failed": 0, "stale_failed": 0, "still_pending": 1,
+    }
+    assert f.sold_quantity == 1
+

@@ -59,6 +59,16 @@ export function ParticipantSheet({
                       Entré sur site
                     </span>
                   )}
+                  {p.email_delivery_status === 'failed' && (
+                    <span className="inline-flex rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-600">
+                      Email échoué
+                    </span>
+                  )}
+                  {p.whatsapp_delivery_status === 'failed' && (
+                    <span className="inline-flex rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-600">
+                      WhatsApp échoué
+                    </span>
+                  )}
                 </div>
 
                 <dl>

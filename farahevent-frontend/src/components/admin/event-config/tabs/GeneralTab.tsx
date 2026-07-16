@@ -39,7 +39,7 @@ export function GeneralTab({
 
   return (
     <div className="max-w-2xl space-y-5">
-      <BilingualField label="Nom de l'événement" value={value.name} onChange={(v) => set('name', v)} />
+      <BilingualField label="Nom de l'événement" value={value?.name || { fr: '', en: '' }} onChange={(v) => set('name', v)} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

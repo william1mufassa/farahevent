@@ -109,6 +109,12 @@ export default function EventConfigPage() {
         </Link>
         <h1 className="text-2xl font-bold">{draft.general.name.fr}</h1>
         <Badge variant="outline">{draft.general.status}</Badge>
+        <Link href={`/admin/evenements/${id}/live`} className="ml-auto">
+          <Button variant="outline" size="sm" className="gap-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-950/20">
+            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            Gérer le live
+          </Button>
+        </Link>
       </div>
 
       <TabsShell tabs={tabs} active={active} onChange={setActive} />

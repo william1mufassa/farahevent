@@ -15,14 +15,14 @@ export interface ChartInk {
 }
 
 export const CHART_LIGHT: ChartInk = {
-  series: '#2a78d6',
+  series: '#4f46e5',
   axis: '#898781',
   grid: '#e1e0d9',
   baseline: '#c3c2b7',
 };
 
 export const CHART_DARK: ChartInk = {
-  series: '#3987e5',
+  series: '#a78bfa',
   axis: '#898781',
   grid: '#2c2c2a',
   baseline: '#383835',

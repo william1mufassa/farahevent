@@ -48,5 +48,8 @@ export function clearSessionCookies(res: NextResponse): void {
 export function isCrossOrigin(req: NextRequest): boolean {
   if (req.method === 'GET' || req.method === 'HEAD') return false;
   const origin = req.headers.get('origin');
+  if (origin && (origin === 'https://farahevent.tech' || origin === 'https://www.farahevent.tech' || origin === 'http://localhost:3000')) {
+      return false;
+  }
   return origin !== null && origin !== req.nextUrl.origin;
 }

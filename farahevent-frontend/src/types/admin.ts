@@ -45,6 +45,8 @@ export interface EventAdmin {
   is_featured: boolean;
   is_deleted: boolean;
   created_at: string;
+  stream_key?: string | null;
+  stream_hls_url?: string | null;
 }
 
 export interface FormulaAdmin {

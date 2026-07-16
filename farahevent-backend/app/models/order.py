@@ -50,7 +50,7 @@ class Order(Base):
     event = relationship("Event", back_populates="orders")
     formula = relationship("Formula", back_populates="orders")
     participant = relationship("Participant", back_populates="orders")
-    tickets = relationship("Ticket", back_populates="order")
+    tickets = relationship("Ticket", back_populates="order", cascade="all, delete-orphan")
     manual_payment = relationship(
         "ManualPayment", back_populates="order", uselist=False, cascade="all, delete-orphan"
     )

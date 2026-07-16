@@ -1,4 +1,5 @@
 """Enums métier — valeurs autorisées pour les colonnes de type String."""
+
 from enum import Enum
 
 
@@ -25,6 +26,9 @@ class EventStatus(str, Enum):
 class EventTemplate(str, Enum):
     A = "A"
     B = "B"
+    C = "C"
+    D = "D"
+
 
 
 class FormulaChannel(str, Enum):

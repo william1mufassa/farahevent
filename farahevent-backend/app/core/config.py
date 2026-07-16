@@ -45,10 +45,20 @@ class Settings(BaseSettings):
     PAYDUNYA_MODE: str = "test"  # test / live
     PAYDUNYA_API_URL: str = "https://app.paydunya.com/api/v1"
 
+    # GeniusPay (Digital payments)
+    GENIUSPAY_API_KEY: str = ""
+    GENIUSPAY_SECRET_KEY: str = ""
+    GENIUSPAY_API_URL: str = "https://geniuspay.ci/api/v1/merchant"
+    GENIUSPAY_WEBHOOK_URL: str = ""
+    GENIUSPAY_MODE: str = "test"
+
     # OpenWA (WhatsApp)
-    OPENWA_API_URL: str = "http://localhost:3001"
+    OPENWA_API_URL: str = "https://wa.farahevent.tech"
     OPENWA_API_KEY: str = ""
     WHATSAPP_SENDER: str = ""
+
+    # Email
+    RESEND_API_KEY: str = ""
 
     # Cloudflare Turnstile (anti-bot du tunnel d'achat) — vide = vérif désactivée (dev)
     TURNSTILE_SECRET_KEY: str = ""

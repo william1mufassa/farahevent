@@ -53,6 +53,8 @@ function build(): ParticipantRow[] {
       currency: 'XOF',
       created_at: created.toISOString(),
       scanned: status === 'paid' && i % 4 === 0,
+      email_delivery_status: 'sent',
+      whatsapp_delivery_status: 'sent',
     });
   }
   return rows;

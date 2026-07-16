@@ -16,6 +16,7 @@ from app.services.whatsapp_service import whatsapp_service
 from app.services.turnstile_service import turnstile_service
 from app.services.revalidate_service import revalidate_service
 from app.services.reconciliation_service import reconcile_pending_orders
+from app.services.live_notifier import live_notifier_loop
 
 # Import des modèles pour qu'Alembic les détecte via Base.metadata.
 import app.models  # noqa: F401
@@ -49,10 +50,13 @@ async def _reconciliation_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     reconciliation_task = asyncio.create_task(_reconciliation_loop())
+    live_notifier_task = asyncio.create_task(live_notifier_loop())
     yield
     reconciliation_task.cancel()
+    live_notifier_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await reconciliation_task
+        await live_notifier_task
     await whatsapp_service.aclose()
     await turnstile_service.aclose()
     await revalidate_service.aclose()

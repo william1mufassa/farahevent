@@ -44,7 +44,7 @@ export async function PurchaseScreen({
           variant="solid"
         />
 
-        <main className="container mx-auto max-w-3xl px-4 pb-24 pt-24">
+        <main className="container mx-auto max-w-6xl px-4 pb-24 pt-24">
           <nav
             aria-label="breadcrumb"
             className="mb-6 flex flex-wrap items-center gap-1.5 text-sm opacity-70"

@@ -42,6 +42,8 @@ class EventUpdate(BaseModel):
     max_capacity: int | None = Field(None, ge=1)
     cover_image_url: str | None = None
     is_featured: bool | None = None
+    stream_key: str | None = None
+    stream_hls_url: str | None = None
 
 
 class EventStatusUpdate(BaseModel):
@@ -65,6 +67,8 @@ class EventAdminOut(BaseModel):
     is_featured: bool
     is_deleted: bool
     created_at: datetime
+    stream_key: str | None = None
+    stream_hls_url: str | None = None
 
 
 # --------------------------------------------------------------------- Formula

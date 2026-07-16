@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -12,8 +13,13 @@ import { ChartTooltip } from './ChartTooltip';
 export function RevenueChart({ data }: { data: RevenuePoint[] }) {
   const ink = useChartInk();
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <h3 className="text-sm font-semibold">Évolution des revenus</h3>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="rounded-xl border border-white/20 bg-white/70 p-5 shadow-lg backdrop-blur-md dark:border-slate-800/40 dark:bg-slate-900/70"
+    >
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Évolution des revenus</h3>
       <div className="mt-4 h-64">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
@@ -58,6 +64,6 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </motion.div>
   );
 }

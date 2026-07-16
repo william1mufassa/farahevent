@@ -1,5 +1,5 @@
 export type EventMode = 'presentiel' | 'online' | 'hybrid';
-export type EventTemplate = 'A' | 'B';
+export type EventTemplate = 'A' | 'B' | 'C' | 'D';
 export type EventStatus = 'draft' | 'open' | 'live' | 'closed';
 export type FormulaChannel = 'presentiel' | 'online' | 'both';
 

@@ -5,6 +5,7 @@ import { sanitizeRichText } from '@/lib/sanitize';
 import type { TemplateSectionProps } from '../types';
 import { SECTION_IDS } from '../types';
 import { SectionTitle } from './SectionTitle';
+import { TeaserPlayer } from '@/components/shared/TeaserPlayer';
 
 /** À propos DIRECTOR'S CUT : texte sobre + citation de respiration (tagline). */
 export function DirectorsCutAbout({ config, locale }: TemplateSectionProps) {
@@ -16,10 +17,13 @@ export function DirectorsCutAbout({ config, locale }: TemplateSectionProps) {
       <div className="container mx-auto">
         <SectionTitle title={t('aboutTitle')} />
         <ScrollReveal>
-          <div
-            className="max-w-2xl space-y-5 text-lg leading-relaxed text-white/70 [&_a]:text-[var(--color-primary)] [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
-          />
+          <div className="space-y-6">
+            <div
+              className="max-w-2xl space-y-5 text-lg leading-relaxed text-white/70 [&_a]:text-[var(--color-primary)] [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichText(l(config.content.description, locale)) }}
+            />
+            <TeaserPlayer url={config.content.teaser_video_url} />
+          </div>
         </ScrollReveal>
         {tagline && (
           <ScrollReveal>

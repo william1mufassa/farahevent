@@ -84,7 +84,26 @@ function ParticipantsContent() {
       align: 'right',
       render: (r) => <span className="tabular-nums">{formatFCFA(r.amount)}</span>,
     },
-    { key: 'status', header: 'Statut', align: 'center', render: (r) => <StatusBadge status={r.status} /> },
+    {
+      key: 'status',
+      header: 'Statut & Envoi',
+      align: 'center',
+      render: (r) => (
+        <div className="flex flex-col items-center gap-1">
+          <StatusBadge status={r.status} />
+          {(r.email_delivery_status === 'failed' || r.whatsapp_delivery_status === 'failed') && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">
+              Échec envoi
+            </span>
+          )}
+          {(r.email_delivery_status === 'sent' || r.whatsapp_delivery_status === 'sent') && r.email_delivery_status !== 'failed' && r.whatsapp_delivery_status !== 'failed' && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
+              Envoyé
+            </span>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'created_at',
       header: 'Date',
