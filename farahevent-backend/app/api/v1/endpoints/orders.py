@@ -9,7 +9,6 @@ Flow :
 import logging
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
@@ -32,6 +31,7 @@ from app.models.participant import Participant
 from app.models.payment_config import PaymentConfig
 from app.schemas.order import OrderCreateRequest, OrderCreateResponse, OrderPublicStatus
 from app.services.payment_provider import CustomerInfo, payment_provider
+from app.services.pricing_service import quote as pricing_quote
 from app.services.notification_hub import manual_payment_notification, notification_hub
 from app.services.upload_service import upload_service
 from app.services.turnstile_service import turnstile_service
@@ -80,21 +80,13 @@ async def create_order(
     # Upsert participant (identifié par email + event)
     participant = await _upsert_participant(db, event_id=event.id, data=data.participant)
 
-    # Calcul des frais dynamiques
-    import math
-    base_price = Decimal(str(formula.price))
-    fee = Decimal("0")
-    if data.payment_mode == "digital" and data.payment_method_label:
-        if data.payment_method_label == "mobile_money":
-            # Frais estimés : ~3.5% + 100 FCFA -> Total = Ceil((Base + 100) / (1 - 0.035))
-            total_float = math.ceil((float(base_price) + 100) / (1 - 0.035))
-            fee = Decimal(str(total_float)) - base_price
-        elif data.payment_method_label == "card":
-            # Frais estimés : ~3.5% + 200 FCFA -> Total = Ceil((Base + 200) / (1 - 0.035))
-            total_float = math.ceil((float(base_price) + 200) / (1 - 0.035))
-            fee = Decimal(str(total_float)) - base_price
-
-    total_amount = base_price + fee
+    # Prix facturé — barème dans pricing_service (source unique, testable).
+    price = pricing_quote(
+        base_price=formula.price,
+        payment_mode=data.payment_mode,
+        payment_method=data.payment_method_label,
+    )
+    base_price, fee, total_amount = price.base, price.fee, price.total
 
     # Création de la commande
     order = Order(
