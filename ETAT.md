@@ -1,6 +1,6 @@
 # ÉTAT — FarahEvent
 
-> **Lire CE fichier en premier, et lui seul.** 126 lignes ≈ **1 700 tokens** — contre ~6 800 pour
+> **Lire CE fichier en premier, et lui seul.** ~150 lignes ≈ **1 900 tokens** — contre ~6 800 pour
 > `SUIVI_PROJET.md` (périmé) et le coût bien plus lourd d'une ré-exploration du code.
 >
 > **Dernière MAJ : 2026-07-17 · Session 4 · S0 ✅ · S1 à ~60 % (GeniusPay câblé)**
@@ -12,22 +12,24 @@
 FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. FastAPI + Next.js 14,
 ~26k LOC, monorepo, **pré-production, 0 utilisateur réel**, dev solo.
 
-**Le code est bon. La chaîne de livraison est le problème.** Un audit complet (2026-07-16) a noté
-5,5/10 et trouvé 5 bloquants vérifiés *par exécution*, pas par lecture. Deux d'entre eux dominent :
-**le backend ne démarre pas** et **79 fichiers ne sont pas commités**.
+**Le code est bon. La chaîne de livraison était le problème.** Audit du 2026-07-16 : 5,5/10,
+5 bloquants vérifiés *par exécution*. **S0 clos** (app démarre, travail poussé, 74/74 verts) ;
+**S1 à ~60 %** (GeniusPay câblé + webhook signé). Tout est sur la branche
+`chantier/live-delivery-admin`, jamais mergé sur `main`.
 
-**➡️ Prochaine action : Sprint S0 (2 h)** — voir `ROADMAP_REMEDIATION.md` §2.
+**➡️ Prochaine action : finir S1** — T1.2 gate Live, T1.3 rate limit upload, T1.4 `/admin/database`,
+T1.5 doc. Voir `ROADMAP_REMEDIATION.md` §3.
 
 ---
 
-## 🚦 État vérifié (2026-07-16)
+## 🚦 État vérifié (2026-07-17)
 
 | Fait | État | Preuve |
 |---|---|---|
 | Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) |
 | Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
 | Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
-| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 7 commits, sur `origin` |
+| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 12 commits, sur `origin` — **jamais mergée sur `main`** |
 | Tests | ✅ **74/74** | vérifié le 2026-07-17 après S1. Les 41 nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
 | CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
 | Encaissement digital | 🟡 **câblé, clés absentes** | code + webhook + 41 tests ✅. Clés absentes du `.env` → **le boot logge « Paiement digital : STUB actif »** (vérifié). Dès que les clés sont posées, le log passe à « GeniusPay (mode=test) » — c'est le témoin à regarder |
@@ -36,7 +38,6 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 | Destruction tracée | ❌ NON | `/admin/database` sans `audit_service`, MANAGER peut hard-delete |
 | Vulns sans auth | 🔴 3 paquets | jose, multipart, starlette (36 advisories py, 4 high npm) |
 | Backups | ❌ AUCUN | rien dans le dépôt |
-| CI | 🟡 verte mais faible | pas de `build`, pas d'audit, pas de couverture |
 | Déployable | ❌ NON | pas de compose prod, pas de Dockerfile front |
 
 ---
@@ -64,10 +65,10 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 
 | Besoin | Commande | Coût |
 |---|---|---|
-| « Pourquoi X ? », « où est Y ? » | `mempalace search "..."` — wing `farahevent_main`, 1851 tiroirs | ~200 tok |
-| Findings d'audit détaillés | `mempalace search "audit"` — room `audit`, 2 tiroirs verbatim | ~400 tok |
+| « Pourquoi X ? », « où est Y ? » | `mempalace search "..."` — wing `farahevent_main`, 1885 tiroirs | ~200 tok |
+| Findings d'audit détaillés | `mempalace search "audit"` — room `audit`, 11 tiroirs verbatim | ~400 tok |
 | « Qui dépend de X ? » | `graphify explain "X"` / `graphify path "A" "B"` | ~200 tok |
-| Carte du code | `graphify-out/GRAPH_REPORT.md` — 1654 nœuds / 4019 arêtes | ~800 tok |
+| Carte du code | `graphify-out/GRAPH_REPORT.md` — 1763 nœuds / 4189 arêtes (rebâti 2026-07-17) | ~800 tok |
 | Le plan | `ROADMAP_REMEDIATION.md` — 5 sprints, gates, DoD | ~3k tok |
 | Historique/contexte | `SUIVI_PROJET.md` — ⚠️ **périmé, voir pièges** | 7k tok |
 
@@ -77,9 +78,10 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 ## ⚠️ Pièges anti-hallucination — lire avant de croire quoi que ce soit
 
-1. **`SUIVI_PROJET.md` a dérivé du code.** Il cite **PayDunya** (le code a **GeniusPay**), ignore
-   Live / `email_service` / `admin/database.py`, et affirme « Chantier 3 terminé & validé
-   end-to-end » pour du code **non commité** sur une app qui **ne démarre pas**. Vérifier dans le code.
+1. **`SUIVI_PROJET.md` a dérivé du code** (T1.5 le corrigera). Il cite **PayDunya** (le code a
+   **GeniusPay**) et ignore Live / `email_service` / `admin/database.py`. Il affirmait aussi
+   « Chantier 3 terminé & validé end-to-end » pour du code non commité, sur une app qui ne
+   démarrait pas — vrai à un instant T, faux au suivant. **Vérifier dans le code, toujours.**
 2. **Les commentaires mentent aussi.** `sanitize.ts` affirme « le backend sanitise à l'entrée » →
    **faux**, zéro sanitisation backend, aucune lib dans `requirements.txt`.
 3. **« 32 tests verts »** décrit un état non commité. Compter soi-même : `bash run_tests.sh`.
@@ -109,7 +111,7 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 ## 🧰 Outillage actif
 
 - **claude-mem** — journal auto, worker `:37777`. Rien à faire.
-- **MemPalace** — wing `farahevent_main` (1851 tiroirs, rooms `farahevent_backend` / `farahevent_frontend` / `audit` / `e2e` / `testing` / `scripts`).
+- **MemPalace** — wing `farahevent_main` (1885 tiroirs, rooms `farahevent_backend` / `farahevent_frontend` / `audit` / `e2e` / `testing` / `scripts`).
 - **graphify** — `graphify-out/` (gitignoré, régénérable).
 - **Skills** — `iron-system` (méta : EXTRACT→SYNTHESIZE→BUILD→AUDIT) + 14 skills **superpowers**
   (TDD, systematic-debugging, writing-plans, verification-before-completion…).
