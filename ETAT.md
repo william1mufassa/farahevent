@@ -3,7 +3,7 @@
 > **Lire CE fichier en premier, et lui seul.** ~150 lignes ≈ **1 900 tokens** — contre ~6 800 pour
 > `SUIVI_PROJET.md` (périmé) et le coût bien plus lourd d'une ré-exploration du code.
 >
-> **Dernière MAJ : 2026-07-17 · Session 4 · S0 ✅ · S1 à ~60 % (GeniusPay câblé)**
+> **Dernière MAJ : 2026-07-17 · Session 4 · S0 ✅ · S1 ✅ — prochain : S2 (durcissement)**
 
 ---
 
@@ -14,11 +14,11 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 
 **Le code est bon. La chaîne de livraison était le problème.** Audit du 2026-07-16 : 5,5/10,
 5 bloquants vérifiés *par exécution*. **S0 clos** (app démarre, travail poussé, 74/74 verts) ;
-**S1 à ~60 %** (GeniusPay câblé + webhook signé). Tout est sur la branche
+**S1 clos** (GeniusPay câblé, Live réparé, destruction tracée, 109 tests). Tout est sur la branche
 `chantier/live-delivery-admin`, jamais mergé sur `main`.
 
-**➡️ Prochaine action : finir S1** — T1.2 gate Live, T1.3 rate limit upload, T1.4 `/admin/database`,
-T1.5 doc. Voir `ROADMAP_REMEDIATION.md` §3.
+**➡️ Prochaine action : S2 (durcissement)** — dépendances jose/multipart/starlette, écrasement de
+participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REMEDIATION.md` §4.
 
 ---
 
@@ -30,12 +30,12 @@ T1.5 doc. Voir `ROADMAP_REMEDIATION.md` §3.
 | Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
 | Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
 | Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 12 commits, sur `origin` — **jamais mergée sur `main`** |
-| Tests | ✅ **74/74** | vérifié le 2026-07-17 après S1. Les 41 nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
+| Tests | ✅ **109/109** | vérifié le 2026-07-17. 33 → 109. Tous les nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
 | CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
 | Encaissement digital | 🟡 **câblé, clés absentes** | code + webhook + 41 tests ✅. Clés absentes du `.env` → **le boot logge « Paiement digital : STUB actif »** (vérifié). Dès que les clés sont posées, le log passe à « GeniusPay (mode=test) » — c'est le témoin à regarder |
 | Encaissement manuel | ✅ OK | testé (`test_manual_payments_http.py`) — **seule voie qui marche** |
-| Accès Live | ❌ **CASSÉ** | `live.py:69` exclut `MANUAL_VALIDATED` = tous les clients réels |
-| Destruction tracée | ❌ NON | `/admin/database` sans `audit_service`, MANAGER peut hard-delete |
+| Accès Live | ✅ **RÉPARÉ** | `MANUAL_VALIDATED` accepté, droit basé sur `formula.channel`, joker ILIKE fermé, rate limit — 10 tests |
+| Destruction tracée | ✅ **OUI** | audit sur les 3 routes, `SUPER_ADMIN` seul, 409 si ventes réelles — **les 13 modules admin sont tracés** |
 | Vulns sans auth | 🔴 3 paquets | jose, multipart, starlette (36 advisories py, 4 high npm) |
 | Backups | ❌ AUCUN | rien dans le dépôt |
 | Déployable | ❌ NON | pas de compose prod, pas de Dockerfile front |
@@ -48,7 +48,7 @@ T1.5 doc. Voir `ROADMAP_REMEDIATION.md` §3.
 
 | # | Action | Détail |
 |---|---|---|
-| **Vous** | Poser les clés sandbox dans `.env` | `GENIUSPAY_API_KEY` / `SECRET_KEY` / `WEBHOOK_SECRET`. ⚠️ éditeur UTF-8, jamais `Add-Content`. ⚠️ le `whsec_` sandbox **diffère** de celui de prod |
+| **Vous** | Poser les clés sandbox dans `.env` (le boot logge le provider actif) | `GENIUSPAY_API_KEY` / `SECRET_KEY` / `WEBHOOK_SECRET`. ⚠️ éditeur UTF-8, jamais `Add-Content`. ⚠️ le `whsec_` sandbox **diffère** de celui de prod |
 | **Vous** | Régénérer les clés **live** | elles ont transité en clair dans un canal journalisé le 2026-07-16 |
 | T1.2 | Gate Live | `live.py:69` exclut `MANUAL_VALIDATED` ; l. 73 teste `event.mode` au lieu de `formula.channel` |
 | T1.3 | Rate limit upload | `/orders/{id}/manual-payment` : upload anonyme sans limite, fichiers orphelins |
@@ -124,6 +124,7 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 | Date | Session | Fait | État après |
 |---|---|---|---|
+| 2026-07-17 | 4b | **S1 ✅.** `payment.refunded` ignoré (billet valide après remboursement) → `refund_service` partagé. Gate Live : 3 défauts, 0 test → 10 tests. Upload : purge des orphelins + rate limit 20/h (NAT mobile CI). `/admin/database` : audit + `SUPER_ADMIN` + gardes ventes + intégrité FK → 13 tests. Doc recalée (`SUIVI_PROJET.md` devient un historique). **109/109.** ⚠️ J'ai reproduit le bug P1 en retirant `PAYDUNYA_*` de `config.py` — boot cassé, annulé. | **S1 clos** |
 | 2026-07-17 | 4 | **S1 T1.1 ✅ — GeniusPay câblé, 74/74 verts.** `_select_provider` (GeniusPay si clés, sinon stub + WARNING), `verify_webhook_signature` sur l'ABC en **fail-closed**, route `POST /webhooks/geniuspay` (signature HMAC corps brut + anti-rejeu 5 min + idempotence + livraison via BackgroundTasks = après commit). **4 écarts au contrat corrigés** en confrontant le code à la doc : `mobile_money` inexistant chez GeniusPay → `pawapay` ; `card` valide (remap inutile) ; objet `customer` absent ; min 200 XOF. **Frais réels** désormais stockés. Défaut de paiement inversé. **+41 tests**, mutation-testés. | S1 ~60 % (T1.1 clos) |
 | 2026-07-16 | 3 | **S0 ✅.** `.env` réparé → config charge. 97 fichiers en 5 commits, poussés → **travail sauvé** (0 secret, vérifié). **D1 tranchée : GeniusPay (GO).** Stack montée : `/health` 200. **3 bugs trouvés en exécutant** : migration `live_links_sent` manquante (live_notifier plantait en boucle) ; handler d'erreur de la réconciliation qui plante lui-même (`MissingGreenlet` sur instance expirée) ; tâche de livraison collectable par le GC. Tests : **20 échecs → 33/33 verts** (2 passages). Reste : ouvrir la PR (`gh` absent). | **S0 terminé** |
 | 2026-07-16 | 2 | Memory system activé (MemPalace wing + graphify). `iron-system` + superpowers installés. Nettoyage : nginx **rapaté** dans `infra/nginx/`, 6 fichiers périmés archivés → `Desktop/_farahevent_archive_2026-07-16/`, caches purgés. `ROADMAP_REMEDIATION.md` + `ETAT.md` créés. | S0 prêt à démarrer |

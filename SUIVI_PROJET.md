@@ -1,12 +1,36 @@
 # Suivi de projet — FarahEvent
 
-> **Document vivant.** Mis à jour à chaque avancée. Dernière MAJ : **2026-07-13 (session 3 — Chantier 3 polish terminé & validé live)**.
-> Objectif : garder en un seul endroit le contexte, ce qui est fait, ce qui reste, comment
-> faire tourner le projet, et la dette connue.
+> # ⚠️ CE DOCUMENT EST UN HISTORIQUE, PAS L'ÉTAT DU PROJET
+>
+> **L'état vivant est dans [`ETAT.md`](ETAT.md)** — à lire en premier, il fait autorité.
+> Le plan d'action est dans [`ROADMAP_REMEDIATION.md`](ROADMAP_REMEDIATION.md).
+>
+> Ce fichier garde le **contexte, les décisions et leur pourquoi**. Il a servi de source
+> d'état jusqu'au 2026-07-13, puis a **dérivé du code** : il décrivait PayDunya alors que
+> le code contenait GeniusPay, ignorait le Live, `email_service` et `admin/database.py`,
+> et annonçait « Chantier 3 terminé & validé end-to-end » pour du code non commité sur une
+> application qui ne démarrait pas. Chaque affirmation était vraie à l'instant où elle a
+> été écrite — c'est précisément le mode de défaillance.
+>
+> **Trois documents, trois rôles disjoints :**
+>
+> | Fichier | Rôle | Coût |
+> |---|---|---|
+> | [`ETAT.md`](ETAT.md) | **État vivant** — où on en est, quoi faire, pièges | ~1,9k tok |
+> | [`ROADMAP_REMEDIATION.md`](ROADMAP_REMEDIATION.md) | Le plan — 5 sprints, gates, DoD | ~6k tok |
+> | `SUIVI_PROJET.md` (ici) | **Historique & décisions** — pourquoi les choix ont été faits | ~7k tok |
+>
+> Dernière MAJ : **2026-07-17** — recalage sur le code réel après l'audit du 2026-07-16.
 
 ---
 
 ## 0. Point de reprise (pour la prochaine session)
+
+> ⚠️ **Section périmée — voir [`ETAT.md`](ETAT.md).** Conservée pour l'historique.
+> Ce qu'elle annonçait est fait : le travail décrit ci-dessous a été commité et poussé
+> le 2026-07-16 (branche `chantier/live-delivery-admin`), PayDunya est abandonné au
+> profit de **GeniusPay** (câblé le 2026-07-17), et la suite est passée de 33 à
+> **109 tests**.
 
 **Dernier commit poussé** : `a9f19b1` — `test(e2e): tunnel d'achat Playwright + point de reprise suivi` (branche `main`, poussé en début de session 3).
 
@@ -54,10 +78,26 @@ Le projet est un **monorepo** :
 - **Streaming live différé en v2** — hors chemin critique du 1er événement (présentiel + online
   sans live). Chantier lourd (VPS 2, Ant Media pass-through, BunnyCDN, session Redis, test de charge).
 - **Stack confirmée = le code réel**, PAS les CDC de juin :
-  - Paiement : **PayDunya** (pas CinetPay).
+  - Paiement : ~~**PayDunya** (pas CinetPay)~~ → **GeniusPay** depuis le 2026-07-16.
   - WhatsApp : **OpenWA** (pas Evolution API).
   - **4 templates** A/B/C/D (pas 2).
   - ⚠ Les CDC v2 (juin) sont **périmés** sur ces points → à annoter si on les rouvre.
+
+> 🔁 **Décision D1 — 2026-07-16 : GeniusPay remplace PayDunya.**
+> `https://geniuspay.ci/api/v1/merchant`, auth par headers `X-API-Key` + `X-API-Secret`,
+> webhook signé `HMAC-SHA256(timestamp + "." + corps_brut, whsec)`. Sandbox disponible.
+> Provider câblé et webhook écrit le 2026-07-17 (41 tests) ; reste à poser les clés.
+>
+> ⚠️ **Les 6 réglages `PAYDUNYA_*` restent dans `config.py`** bien qu'aucun code ne les
+> lise. Les retirer ferait **échouer le boot** : `pydantic-settings` refuse les champs
+> non déclarés, et les `.env` existants contiennent encore ces lignes — même mode de
+> défaillance que le `.env` corrompu de l'audit. Retrait sûr **en deux temps** : purger
+> les lignes de chaque `.env`, PUIS supprimer les champs. Jamais l'inverse.
+> *(Vérifié : la suppression directe casse `Settings()` — `extra_forbidden`.)*
+>
+> *Ironie à retenir : cette section dénonçait des CDC « périmés » tout en le devenant
+> elle-même sur exactement le même point. Un document n'est pas fiable parce qu'il est
+> bien écrit — il l'est parce qu'on le vérifie contre le code.*
 
 ### Documents de référence
 - `Cahier_des_charges_Billetterie_Hybride_v2.docx` (CDC v2, juin — partiellement périmé).
@@ -132,16 +172,19 @@ npm --prefix e2e run test
 
 ## 4. Plan par chantiers (séquence valeur/risque)
 
+> ⚠️ **Tableau recalé le 2026-07-17.** L'état fait foi dans [`ETAT.md`](ETAT.md) ;
+> le séquencement dans [`ROADMAP_REMEDIATION.md`](ROADMAP_REMEDIATION.md) (sprints S0→S4).
+
 | # | Chantier | État |
 |---|---|---|
-| 1 | Sécurité socle | ✅ **Terminé & validé end-to-end** |
-| 2 | Paiement complet | 🟡 **Partiel** (oversell + réconciliation faits ; PayDunya reporté) |
+| 1 | Sécurité socle | 🟡 **Repris** — le socle tenait, mais l'audit du 2026-07-16 a trouvé 36 advisories Python (jose/multipart/starlette atteignables sans auth), l'écrasement de participant, une fuite PII sur `/tickets/resend`. Corrigés depuis : `/admin/database` (audit + RBAC), upload borné, gate Live. **Reste : dépendances (S2)** |
+| 2 | Paiement complet | 🟡 **GeniusPay câblé** (2026-07-17) — provider + webhook signé + 41 tests. `payment.refunded` traité (il était ignoré : le billet restait valide après remboursement). **Reste : poser les clés + tunnel pour tester en local** |
 | 3 | Intégration front↔back | 🟢 **Terminé** (admin + public + WS temps réel + ISR étendue + next/image ; reste : endpoint comms externe) |
-| 4 | Livraison billets & comms | 🔴 À faire (Brevo + file OpenWA + n8n) |
-| 5 | DevOps / prod | 🔴 À faire (compose prod, nginx/SSL, CI, backups) |
-| 6 | Tests & QA | 🟡 **En cours** — pytest backend (32 tests verts) + CI ; Playwright + charge à faire |
+| 4 | Livraison billets & comms | 🟡 **email_service (Resend) + WhatsApp écrits** — mais **AUCUN retry** : client payé + Resend down = billet jamais reçu. C'est le vrai risque du jour J (T3.10) |
+| 5 | DevOps / prod | 🔴 À faire (compose prod, Dockerfile front, nginx/SSL, backups) |
+| 6 | Tests & QA | 🟡 **109 tests verts** (33 → 109). ⚠️ Les « 32 tests verts » annoncés jusqu'ici étaient **faux** : à la première exécution réelle, la suite était à **20 échecs**. Reste : e2e en CI, charge, couverture |
 | 7 | Déploiement + docs + formation | 🔴 À faire |
-| v2 | Streaming live | 🔴 Différé après le 1er event |
+| v2 | Streaming live | 🟡 **Plus différé** — `live.py`, `live_notifier`, pages front existent. Le gate d'accès a été réparé (3 défauts, 0 test auparavant) |
 
 ---
 
@@ -322,9 +365,28 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 
 ## 7. Dette technique & risques connus (issus de l'audit)
 
+> **Recalé le 2026-07-17.** Ce tableau listait de la dette réelle — mais il en **omettait
+> l'essentiel**, parce qu'il avait été rédigé sans jamais exécuter la stack. Les défauts
+> ci-dessous n'ont été trouvés qu'en lançant le code :
+>
+> | Trouvé en exécutant | Pourquoi invisible à la lecture |
+> |---|---|
+> | Le backend **ne démarrait pas** (`.env` mixte UTF-8/UTF-16) | il fallait tenter le boot |
+> | Migration `live_links_sent` **manquante** → `live_notifier` plantait en boucle | la suite construit le schéma via `create_all` depuis le **modèle**, jamais via Alembic — un oubli de migration y est **structurellement invisible**, en test comme en CI |
+> | Le handler d'erreur de la réconciliation **plantait lui-même** (`MissingGreenlet` sur instance expirée) | il fallait déclencher le chemin d'erreur |
+> | Tâche de livraison **collectable par le GC** (`create_task` sans référence) | comportement documenté d'asyncio, invisible en relecture |
+> | Un test appelait le **vrai serveur OpenWA de production** | il fallait regarder le trafic |
+> | `payment.refunded` **ignoré** → billet valide après remboursement | il fallait lire la config du tableau de bord GeniusPay |
+> | La suite était à **20 échecs**, pas « 32 verts » | il fallait la lancer |
+
 | Sujet | État |
 |---|---|
-| Tests automatisés | 🟡 **pytest backend (32)** + **Playwright e2e (3, tunnel d'achat)** ; restent **e2e-en-CI + tests de charge** |
+| Tests automatisés | 🟢 **109 tests backend verts** (33 → 109), les nouveaux **mutation-testés** ; + Playwright e2e (3) ; restent **e2e-en-CI + charge + couverture** |
+| **Suite aveugle aux migrations oubliées** | 🔴 `conftest` construit le schéma via `Base.metadata.create_all` (modèle), jamais via Alembic → prod cassée / CI verte. Angle mort structurel |
+| **Pas de mock des dépendances externes** | 🟠 un test joignait la prod ; neutralisé au cas par cas, aucune stratégie globale |
+| **Livraison sans retry** (`send_tickets_bg`) | 🔴 client payé + Resend down = billet jamais reçu, seule alerte = notif WS en direct. **Vrai risque du jour J** (T3.10) |
+| Dépendances vulnérables | 🔴 36 advisories py — jose/multipart/starlette **atteignables sans auth** ; 4 high npm (menace réelle < chiffre brut, cf. `ETAT.md`) |
+| Backups PostgreSQL | 🔴 **aucun** |
 | **WS notifications single-process** (hub in-memory) | 🟡 multi-worker gunicorn ⇒ backplane **Redis pub/sub** requis (§6) |
 | Templates : `<Image src="">` si `hero_image_url` vide (warning preload/src) | 🟡 fallback à prévoir (§6) |
 | CI/CD | 🟢 **CI verte sur GitHub** (backend pytest + front lint/typecheck) ; restent Dockerfile frontend + compose prod (déploiement) |
@@ -365,6 +427,45 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 ---
 
 ## 9. Changelog
+
+### 2026-07-17 — Sprint S1 : GeniusPay câblé, Live réparé, destruction tracée (109 tests)
+- **GeniusPay branché** (D1 : PayDunya abandonné). Le provider existait, bien écrit, mais
+  n'était **relié à rien** : il lisait `settings.GENIUSPAY_BASE_URL`, une clé jamais déclarée
+  (`AttributeError` avant tout appel réseau) ; `payment_provider` restait `StubPaymentProvider()` ;
+  aucune route webhook n'existait. Ajoutés : `_select_provider()` (+ WARNING au boot si le stub
+  prend le relais — un `.env` incomplet ne criait pas), `verify_webhook_signature` sur l'ABC en
+  **fail-closed**, `POST /webhooks/geniuspay` (HMAC corps brut + anti-rejeu 5 min + idempotence
+  + livraison après commit).
+- **4 écarts au contrat** corrigés en confrontant le code à la doc GeniusPay : `mobile_money`
+  n'existe pas chez eux (→ `pawapay`, auto-routage par le numéro) ; `card` était valide (remap
+  vers `paystack` inutile) ; objet `customer` jamais envoyé ; minimum 200 XOF non validé.
+  **Frais réels** (`fees`/`net_amount`) désormais stockés — l'estimation locale (3,5 % + 100 F)
+  garantissait un écart comptable.
+- **`payment.refunded` était ignoré** : la garde d'idempotence l'avalait → argent rendu, place
+  jamais libérée, **billet toujours valide**. `refund_service` partagé avec l'endpoint admin.
+- **Gate Live réparé** — 3 défauts, 0 test auparavant : `MANUAL_VALIDATED` exclu (donc **aucun
+  client réel** ne pouvait entrer) ; décision sur `event.mode` au lieu de `formula.channel`
+  (fuite de revenu) ; joker `ILIKE` (`ref="%"` matchait tout billet).
+- **`/admin/database` sécurisé** : audit sur les 3 routes, `SUPER_ADMIN` seul sur hard-delete,
+  409 si ventes réelles, intégrité FK réparée. **Les 13 modules de mutation admin sont tracés.**
+- **Upload borné** : purge des reçus orphelins (croissance disque non bornée) + rate limit 20/h
+  (et non 3/h : le NAT mobile ivoirien fait partager une IP à des dizaines d'acheteurs).
+- **Défaut de paiement inversé** — `_load_payment_config_or_default` ouvrait le digital et
+  **fermait le manuel** : tout nouvel événement n'acceptait que la voie cassée.
+- Docs : `ETAT.md` (point d'entrée, ~1,9k tok) + `ROADMAP_REMEDIATION.md` (5 sprints).
+
+### 2026-07-16 — Sprint S0 + audit complet (11 dimensions, 5,5/10)
+- **Le backend ne démarrait pas** : `.env` en encodage mixte UTF-8 + UTF-16LE (PowerShell
+  `Add-Content` sans `-Encoding utf8`) → `ValidationError` pydantic. Piège : le volume du compose
+  monte le fichier dans le conteneur, `.dockerignore` ne filtre que le contexte de build.
+- **97 fichiers non commités** (3 jours de travail, une seule machine) → 5 commits poussés.
+- **3 bugs trouvés en exécutant** : migration `live_links_sent` manquante (`live_notifier`
+  plantait en boucle) ; handler d'erreur de la réconciliation qui plantait lui-même ; tâche de
+  livraison collectable par le GC.
+- **Les tests n'étaient pas « 32 verts » mais à 20 échecs.** La base de test périmée + `create_all`
+  (qui n'altère jamais une table existante) les masquait.
+- `infra/nginx/farahevent.conf` **rapatrié** — la config nginx de prod n'existait qu'en copie
+  unique hors dépôt.
 
 ### 2026-07-13 — Chantier 3 (polish) terminé & validé end-to-end en live
 - **WS notifications temps réel avec auth** ✅ — endpoint `/ws/admin/notifications` + **ticket

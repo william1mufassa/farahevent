@@ -37,12 +37,19 @@ class Settings(BaseSettings):
         "https://www.farahevent.tech",
     ]
 
-    # PayDunya (Sprint 5 — le collabo branche)
+    # PayDunya — ABANDONNÉ le 2026-07-16 au profit de GeniusPay (décision D1).
+    # Aucun code ne lit ces réglages. Ils sont conservés UNIQUEMENT parce que
+    # pydantic-settings refuse les champs extra (`extra='forbid'`) : les retirer
+    # ferait ÉCHOUER LE BOOT de tout déploiement dont le `.env` les contient encore
+    # — c'est-à-dire celui-ci. Même mode de défaillance que le `.env` corrompu de
+    # l'audit : la config casse au démarrage, pas à l'usage.
+    # Retrait sûr = en deux temps : purger les lignes des `.env` de chaque
+    # environnement, PUIS supprimer ces champs. Jamais l'inverse.
     PAYDUNYA_MASTER_KEY: str = ""
     PAYDUNYA_PRIVATE_KEY: str = ""
     PAYDUNYA_PUBLIC_KEY: str = ""
     PAYDUNYA_TOKEN: str = ""
-    PAYDUNYA_MODE: str = "test"  # test / live
+    PAYDUNYA_MODE: str = "test"
     PAYDUNYA_API_URL: str = "https://app.paydunya.com/api/v1"
 
     # GeniusPay — paiement digital (mobile money + carte, Côte d'Ivoire).
