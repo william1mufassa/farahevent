@@ -39,13 +39,32 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      # Ajouté le 2026-07-17, APRÈS avoir résorbé les advisories (36 -> 2) : un scan
+      # branché sur une CI déjà rouge se fait désactiver dans la semaine. Il est
+      # BLOQUANT — c'est tout son intérêt.
+      #
+      # `ecdsa` et `pyasn1` restent ignorés : leurs versions sont ÉPINGLÉES par
+      # python-jose (`pyasn1<0.5.0`), aucun correctif n'est atteignable sans quitter
+      # cette lib. `ecdsa` n'a d'ailleurs aucun correctif publié. Ignorer un
+      # advisory sans écrire pourquoi, c'est le rendre invisible pour toujours.
+      # Le vrai correctif = migrer vers PyJWT (ni ecdsa ni pyasn1) — à planifier.
+      - name: Audit des dépendances (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt \
+            --ignore-vuln PYSEC-2026-1325 \
+            --ignore-vuln PYSEC-2026-2263
+
       - name: Run tests
         env:
           APP_ENV: development
           DEBUG: "False"
           DB_NULLPOOL: "1"
           DATABASE_URL: postgresql+asyncpg://farahevent_user:devpassword@localhost:5432/farahevent_test
-        run: python -m pytest -q
+        # Seuil 60 % : plancher posé juste sous le réel mesuré (64 % au 2026-07-17).
+        # Un seuil qu'on n'atteint pas se désactive au bout de deux semaines ; un
+        # plancher sous le réel empêche la régression et se relève à chaque palier.
+        run: python -m pytest -q --cov=app --cov-report=term-missing --cov-fail-under=60
 
   frontend:
     name: Frontend — lint & typecheck
@@ -65,8 +84,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # NON bloquant, volontairement : les 4 advisories high de Next 14 n'ont AUCUN
+      # correctif dans la branche 14.x (npm propose Next 16 = breaking). Rendre ce
+      # scan bloquant aujourd'hui, c'est une CI rouge en permanence — donc une CI
+      # qu'on cesse de lire. Il reste ici pour rendre VISIBLE toute NOUVELLE vuln.
+      # À passer bloquant avec la migration Next 16 (S4).
+      - name: Audit npm (informatif)
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
+
+      # Absent jusqu'au 2026-07-17 : lint + typecheck ne compilent pas le projet.
+      # Une régression de build passait donc la CI et n'apparaissait qu'au déploiement.
+      # NEXT_PUBLIC_USE_MOCK=0 : la CI doit construire ce que la prod construira.
+      - name: Build
+        env:
+          NEXT_PUBLIC_USE_MOCK: "0"
+        run: npm run build
