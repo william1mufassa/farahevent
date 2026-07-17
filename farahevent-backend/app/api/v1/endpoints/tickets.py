@@ -4,6 +4,7 @@
 - GET  /{id}/qr (admin) : récupérer l'image QR d'un ticket (pour ré-envoi manuel).
 - POST /resend (public) : re-livraison d'un billet à l'acheteur.
 """
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -27,6 +28,10 @@ from app.schemas.ticket import ScanRequest, ScanResponse
 from app.services.qr_service import qr_service
 
 router = APIRouter()
+
+# Alphabet réel d'une référence de billet : hex + tirets d'UUID. Tout le reste
+# (dont les jokers ILIKE % et _) est refusé avant d'atteindre la base.
+_SHORT_REF_RE = re.compile(r"^[0-9a-f-]{4,36}$")
 
 
 _SCAN_ROLES = (AdminRole.AGENT, AdminRole.SUPER_ADMIN)
@@ -191,8 +196,14 @@ async def resend_ticket(
     except ValueError:
         pass
 
-    # Si non trouvé, on cherche avec la référence courte (8 derniers caractères) via les tickets ou la commande
-    if not order:
+    # Si non trouvé, on cherche avec la référence courte (8 derniers caractères).
+    #
+    # `ref_input` est interpolé dans un motif ILIKE. SQLAlchemy paramètre la valeur
+    # (donc pas d'injection SQL), MAIS `%` et `_` restent des JOKERS : `order_id="%"`
+    # matchait N'IMPORTE QUEL billet de l'email fourni. On borne l'entrée à
+    # l'alphabet réel d'une référence — un allowlist se raisonne, un échappement
+    # s'oublie. (Même correctif que `/live/access`.)
+    if not order and _SHORT_REF_RE.match(ref_input):
         from sqlalchemy import cast, String
         # Chercher par ticket short ref
         result = await db.execute(
@@ -231,8 +242,15 @@ async def resend_ticket(
         str(order.id)
     )
 
+    # Coordonnées MASQUÉES dans la réponse. L'endpoint est anonyme : il suffisait
+    # de connaître l'email d'un acheteur pour lui faire cracher son numéro de
+    # téléphone en clair. L'acheteur légitime reconnaît ses propres coordonnées
+    # à quelques caractères ; un tiers n'apprend rien d'exploitable.
     return {
-        "message": f"Renvoi programmé vers {participant.email} et {participant.whatsapp}",
+        "message": (
+            f"Renvoi programmé vers {_mask_email(participant.email)}"
+            f" et {_mask_phone(participant.whatsapp)}"
+        ),
         "tickets_count": len(tickets),
         "channels": ["email", "whatsapp"],
     }
@@ -246,6 +264,26 @@ def _safe_uuid(value) -> uuid.UUID | None:
         return uuid.UUID(value)
     except (ValueError, TypeError):
         return None
+
+
+def _mask_email(value: str | None) -> str:
+    """`awa.diallo@gmail.com` → `aw•••@gmail.com`.
+
+    Assez pour que le propriétaire se reconnaisse, pas assez pour qu'un tiers
+    apprenne quelque chose qu'il ne savait pas déjà (il a fourni l'email).
+    """
+    if not value or "@" not in value:
+        return "votre email"
+    local, _, domain = value.partition("@")
+    return f"{local[:2]}•••@{domain}"
+
+
+def _mask_phone(value: str | None) -> str:
+    """`+2250700000000` → `•••••••0000`. Les 4 derniers suffisent à se reconnaître."""
+    if not value:
+        return "votre WhatsApp"
+    tail = value[-4:]
+    return f"{'•' * max(len(value) - 4, 3)}{tail}"
 
 
 async def _log_scan(

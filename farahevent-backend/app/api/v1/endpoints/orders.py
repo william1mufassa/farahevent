@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -408,7 +408,20 @@ def _validate_channel_for_event(formula: Formula, event: Event):
 async def _upsert_participant(
     db: AsyncSession, *, event_id, data
 ) -> Participant:
-    """Réutilise le participant déjà présent pour (email, event) s'il existe."""
+    """Réutilise le participant déjà présent pour (email, event) s'il existe.
+
+    ⚠ Les coordonnées d'un participant qui a DÉJÀ payé sont GELÉES.
+
+    Cet endpoint est anonyme : sans ce gel, quiconque connaît l'email d'un
+    acheteur pouvait créer une commande sur le même événement et réécrire son
+    `whatsapp`. La livraison (`send_tickets_bg` lit `participant.whatsapp`) et le
+    ré-envoi partaient alors chez l'attaquant — vol de billet sans jamais toucher
+    à un compte.
+
+    Avant paiement, la mise à jour reste utile et inoffensive : aucun billet
+    n'existe encore, et l'acheteur corrige légitimement une faute de frappe.
+    Après paiement, un vrai changement de coordonnées passe par l'admin.
+    """
     q = (
         select(Participant)
         .join(Order, Order.participant_id == Participant.id)
@@ -419,7 +432,22 @@ async def _upsert_participant(
     result = await db.execute(q)
     existing = result.scalar_one_or_none()
     if existing:
-        # Mise à jour légère des champs qui peuvent avoir changé
+        already_paid = await db.scalar(
+            select(func.count(Order.id)).where(
+                Order.participant_id == existing.id,
+                Order.status.in_(
+                    (OrderStatus.PAID.value, OrderStatus.MANUAL_VALIDATED.value)
+                ),
+            )
+        )
+        if already_paid:
+            logger.warning(
+                "Commande anonyme sur l'email d'un acheteur déjà payé "
+                "(participant=%s) — coordonnées conservées, non écrasées.",
+                existing.id,
+            )
+            return existing
+
         existing.first_name = data.first_name
         existing.last_name = data.last_name
         existing.whatsapp = data.whatsapp
