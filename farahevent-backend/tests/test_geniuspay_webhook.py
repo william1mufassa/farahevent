@@ -228,3 +228,58 @@ async def test_missing_order_id_returns_200(client):
 
     assert r.status_code == 200
     assert r.json()["reason"] == "missing_order_id"
+
+
+# ------------------------------------------------------------------ remboursement
+# `payment.refunded` fait partie des événements auxquels le compte GeniusPay est
+# abonné. Sans traitement dédié, la garde d'idempotence l'avalait ("already_paid")
+# et le billet restait VALIDE alors que l'argent était rendu.
+
+
+async def test_refund_releases_seat_and_invalidates_ticket(client, db, order):
+    from app.models.formula import Formula
+
+    # 1) paiement → billet émis, 1 place vendue
+    await _post(client, _payload(order.id))
+    await db.refresh(order)
+    formula = await db.get(Formula, order.formula_id)
+    await db.refresh(formula)
+    assert formula.sold_quantity == 1
+
+    # 2) remboursement
+    r = await _post(client, _payload(order.id, status="refunded"))
+    assert r.status_code == 200
+    assert r.json()["handled"] is True
+
+    await db.refresh(order)
+    await db.refresh(formula)
+    assert order.status == "REFUNDED"
+    # La place est rendue au stock…
+    assert formula.sold_quantity == 0
+    # …et le billet devient invalide de fait : /tickets/scan refuse tout ticket
+    # dont l'order n'est pas PAID/MANUAL_VALIDATED.
+
+
+async def test_refund_replay_does_not_release_seat_twice(client, db, order):
+    """Le provider rejoue ses webhooks : un double refund fausserait sold_quantity."""
+    from app.models.formula import Formula
+
+    await _post(client, _payload(order.id))
+    await _post(client, _payload(order.id, status="refunded"))
+    r = await _post(client, _payload(order.id, status="refunded"))
+
+    assert r.status_code == 200
+    assert r.json()["reason"] == "already_refunded"
+
+    formula = await db.get(Formula, order.formula_id)
+    await db.refresh(formula)
+    assert formula.sold_quantity == 0, "un rejeu a libéré une seconde place"
+
+
+async def test_refund_on_unpaid_order_is_acknowledged_not_applied(client, db, order):
+    r = await _post(client, _payload(order.id, status="refunded"))
+
+    assert r.status_code == 200
+    assert r.json()["reason"] == "not_refundable"
+    await db.refresh(order)
+    assert order.status == "PENDING"

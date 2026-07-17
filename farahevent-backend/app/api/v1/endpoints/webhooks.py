@@ -30,6 +30,7 @@ from app.core.database import get_db
 from app.models.enums import OrderStatus
 from app.models.order import Order
 from app.services.payment_provider import payment_provider
+from app.services.refund_service import NotRefundableError, refund_order
 from app.services.ticket_service import StockExceededError, ticket_service
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,9 @@ _TIMESTAMP_TOLERANCE_SECONDS = 300  # 5 min
 _PAID_STATUSES = {"completed"}
 # Statuts terminaux négatifs.
 _FAILED_STATUSES = {"failed", "cancelled", "expired"}
+# Remboursement : traité à part — l'argent est rendu APRÈS un encaissement, il
+# faut donc libérer la place et invalider le billet, pas juste marquer un échec.
+_REFUNDED_STATUSES = {"refunded"}
 
 
 @router.post("/geniuspay", status_code=status.HTTP_200_OK)
@@ -108,7 +112,29 @@ async def geniuspay_webhook(
         logger.error("Webhook GeniusPay: commande %s introuvable", parsed_id)
         return {"received": True, "handled": False, "reason": "order_not_found"}
 
-    # --- 4. Idempotence — un rejeu ne change rien ---
+    # --- 4. Remboursement — AVANT la garde d'idempotence ---
+    # Une commande remboursée est forcément déjà PAID : la garde ci-dessous
+    # l'avalerait et le remboursement serait ignoré en silence, laissant le billet
+    # valide alors que l'argent est rendu. `payment.refunded` fait partie des
+    # événements auxquels le compte est abonné — ce n'est pas hypothétique.
+    if gp_status in _REFUNDED_STATUSES or event == "payment.refunded":
+        if order.status == OrderStatus.REFUNDED.value:
+            return {"received": True, "handled": True, "reason": "already_refunded"}
+        try:
+            await refund_order(db, order)
+        except NotRefundableError:
+            # Remboursement d'une commande jamais payée de notre côté : rien à
+            # libérer. On acquitte pour ne pas faire retenter le provider.
+            logger.warning(
+                "Webhook GeniusPay: refund sur commande %s au statut %s — ignoré",
+                parsed_id,
+                order.status,
+            )
+            return {"received": True, "handled": False, "reason": "not_refundable"}
+        logger.info("Webhook GeniusPay: commande %s → REFUNDED, place libérée", parsed_id)
+        return {"received": True, "handled": True, "status": order.status}
+
+    # --- 5. Idempotence — un rejeu ne change rien ---
     if order.status in (OrderStatus.PAID.value, OrderStatus.MANUAL_VALIDATED.value):
         return {"received": True, "handled": True, "reason": "already_paid"}
 
@@ -119,7 +145,7 @@ async def geniuspay_webhook(
     if not order.payment_provider:
         order.payment_provider = payment_provider.name
 
-    # --- 5. Effet métier ---
+    # --- 6. Effet métier ---
     if gp_status in _FAILED_STATUSES:
         order.status = OrderStatus.FAILED.value
         logger.info("Webhook GeniusPay: commande %s → FAILED (%s)", parsed_id, gp_status)

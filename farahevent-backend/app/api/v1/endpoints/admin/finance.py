@@ -20,6 +20,7 @@ from app.models.formula import Formula
 from app.models.order import Order
 from app.models.participant import Participant
 from app.services.audit_service import audit_service
+from app.services.refund_service import NotRefundableError, refund_order
 
 router = APIRouter()
 
@@ -113,21 +114,12 @@ async def refund_transaction(
     order = (await db.execute(select(Order).where(Order.id == parsed))).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Transaction introuvable")
-    if order.status not in (OrderStatus.PAID.value, OrderStatus.MANUAL_VALIDATED.value):
-        raise HTTPException(
-            status_code=409, detail=f"Seule une commande payée est remboursable (statut {order.status})"
-        )
-
-    # Libère la place sous verrou pour garder sold_quantity exact (cf. anti-oversell).
-    formula = (
-        await db.execute(
-            select(Formula).where(Formula.id == order.formula_id).with_for_update()
-        )
-    ).scalar_one_or_none()
-    if formula and formula.sold_quantity > 0:
-        formula.sold_quantity -= 1
-
-    order.status = OrderStatus.REFUNDED.value
+    # Même service que le webhook `payment.refunded` : un remboursement doit avoir
+    # exactement le même effet, qu'il vienne de l'admin ou du provider.
+    try:
+        await refund_order(db, order)
+    except NotRefundableError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
     await audit_service.log(
         db, admin=admin, action="transaction.refund",
