@@ -3,7 +3,7 @@
 > **Lire CE fichier en premier, et lui seul.** ~150 lignes ≈ **1 900 tokens** — contre ~6 800 pour
 > `SUIVI_PROJET.md` (périmé) et le coût bien plus lourd d'une ré-exploration du code.
 >
-> **Dernière MAJ : 2026-07-17 · Session 4 · S0 ✅ · S1 ✅ — prochain : S2 (durcissement)**
+> **Dernière MAJ : 2026-07-17 · Session 4 · S0 ✅ S1 ✅ S2 ✅ (sauf Sentry) — prochain : S3**
 
 ---
 
@@ -14,11 +14,12 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 
 **Le code est bon. La chaîne de livraison était le problème.** Audit du 2026-07-16 : 5,5/10,
 5 bloquants vérifiés *par exécution*. **S0 clos** (app démarre, travail poussé, 74/74 verts) ;
-**S1 clos** (GeniusPay câblé, Live réparé, destruction tracée, 109 tests). Tout est sur la branche
-`chantier/live-delivery-admin`, jamais mergé sur `main`.
+**S1 clos** (GeniusPay câblé, Live réparé, destruction tracée) ; **S2 clos sauf Sentry**
+(36 → 2 advisories, CI qui mord, 4 failles fermées). **153 tests.** Tout est sur la branche
+`chantier/live-delivery-admin`, **jamais mergé sur `main`**.
 
-**➡️ Prochaine action : S2 (durcissement)** — dépendances jose/multipart/starlette, écrasement de
-participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REMEDIATION.md` §4.
+**➡️ Prochaine action : S3 (livrable)** — Dockerfile durci, compose prod, **backups + test de
+restauration**, et **T3.10 retry/DLQ** (le vrai risque du jour J). Voir `ROADMAP_REMEDIATION.md` §5.
 
 ---
 
@@ -29,39 +30,43 @@ participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REM
 | Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) |
 | Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
 | Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
-| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 18 commits, sur `origin` — **jamais mergée sur `main`** |
-| Tests | ✅ **109/109** | vérifié le 2026-07-17. 33 → 109. Tous les nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
-| CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
+| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 23 commits, sur `origin` — **jamais mergée sur `main`** |
+| Tests | ✅ **153/153** | vérifié le 2026-07-17. 33 → 153. Tous les nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
+| CI | 🟡 **renforcée, non déclenchée** | `build` + couverture 60 % + `pip-audit` bloquants ajoutés. Ne tourne que sur `main` ou PR→`main` → **PR à ouvrir à la main** (`gh` absent) |
 | Encaissement digital | 🟡 **câblé, clés absentes** | code + webhook + 41 tests ✅. Clés absentes du `.env` → **le boot logge « Paiement digital : STUB actif »** (vérifié). Dès que les clés sont posées, le log passe à « GeniusPay (mode=test) » — c'est le témoin à regarder |
 | Encaissement manuel | ✅ OK | testé (`test_manual_payments_http.py`) — **seule voie qui marche** |
 | Accès Live | ✅ **RÉPARÉ** | `MANUAL_VALIDATED` accepté, droit basé sur `formula.channel`, joker ILIKE fermé, rate limit — 10 tests |
 | Destruction tracée | ✅ **OUI** | audit sur les 3 routes, `SUPER_ADMIN` seul, 409 si ventes réelles — **les 13 modules admin sont tracés** |
-| Vulns sans auth | 🔴 3 paquets | jose, multipart, starlette (36 advisories py, 4 high npm) |
-| Backups | ❌ AUCUN | rien dans le dépôt |
+| Vulns sans auth | ✅ **0** | jose/multipart/starlette réglés. 36 → **2** advisories, ignorées avec raison écrite (ecdsa : aucun correctif ; pyasn1 : épinglé par python-jose). npm : 4 high sans correctif en 14.x → Next 16 en S4 |
+| Backups | ❌ AUCUN | rien dans le dépôt — **S3** |
+| Observabilité | ❌ AUCUNE | Sentry non câblé — **décision en attente (DSN ?)** |
+| Livraison billets | 🔴 **sans retry** | client payé + Resend down = billet jamais reçu. **T3.10 — vrai risque du jour J** |
 | Déployable | ❌ NON | pas de compose prod, pas de Dockerfile front |
 
 ---
 
-## ▶️ Sprint S2 — durcissement (prochain)
+## ▶️ Sprint S3 — livrable (prochain)
 
-**S1 clos le 2026-07-17** : GeniusPay câblé + webhook signé, `payment.refunded` traité,
-gate Live réparé, upload borné, `/admin/database` sécurisé, doc recalée. 109 tests.
+**S2 clos le 2026-07-17**, sauf T2.9 Sentry (décision en attente : DSN ou câblage à vide ?).
+Dépendances 36 → 2, CI qui mord, 4 failles fermées (écrasement participant, fuite PII,
+Turnstile silencieux, IP d'audit falsifiable), pricing extrait.
 
-| # | Action | Détail |
+| # | Action | Pourquoi |
 |---|---|---|
-| **Vous** | Poser les clés sandbox dans `.env` | ⚠️ éditeur UTF-8, jamais `Add-Content`. ⚠️ le `whsec_` **sandbox** diffère de celui de prod. Témoin : le boot logge le provider actif |
-| **Vous** | Régénérer les clés **live** | elles ont transité en clair dans un canal journalisé le 2026-07-16 |
 | **Vous** | Ouvrir la PR | la CI ne tourne que sur `main` ou PR→`main` (`gh` absent ici) |
-| T2.1 | `python-jose` → 3.4.0 | confusion d'algo + DoS ; signe l'auth admin ET les billets QR |
-| T2.2 | `python-multipart` + `starlette` | DoS multipart **atteignable sans auth** ; implique de bumper FastAPI |
-| T2.3 | Écrasement de participant | `orders.py` `_upsert_participant` écrase `whatsapp` depuis une entrée anonyme |
-| T2.4 | Fuite PII `/tickets/resend` | renvoie le WhatsApp en clair + même joker ILIKE (déjà fermé sur `/live/access`) |
-| T2.5 | Turnstile dans le boot-guard | no-op silencieux si la clé est vide, même en prod |
-| T2.6 | XFF dans le proxy BFF | le backend logge l'IP du serveur Next, pas celle de l'admin |
-| T2.8 | CI qui mord | `npm run build` (absent !), `pip-audit`, `npm audit`, couverture |
-| T2.9 | Sentry | zéro observabilité aujourd'hui |
+| **Vous** | Clés sandbox GeniusPay | ⚠️ il manque le `whsec_` **sandbox**. Éditeur UTF-8, jamais `Add-Content` |
+| **Vous** | Régénérer les clés **live** | transitées en clair dans un canal journalisé le 2026-07-16 |
+| **Vous** | Sentry : DSN ou pas ? | dernier item de S2 |
+| **T3.10** | **Retry/DLQ livraison** | 🔴 **le vrai risque du jour J** : client payé + Resend down = billet jamais reçu, seule alerte une notif WS qu'un admin doit voir en direct |
+| T3.5 | **Backups + test de restauration** | 🔴 aucun aujourd'hui. Un backup jamais restauré n'est pas un backup |
+| T3.1 | Dockerfile durci | tourne en **root**, pas de multi-stage, pas de healthcheck, logs bufferisés |
+| T3.2/3.3 | Dockerfile front + `compose.prod` | n'existent pas → aucun chemin de déploiement |
+| T3.6 | Limiter sur Redis | **avant** tout multi-worker, sinon le rate-limit est par worker donc contournable |
+| T3.7 | Backplane WS Redis | idem — le hub est in-memory |
+| T3.8 | `/health` réel | ne teste pas la base : ment quand Postgres est tombé |
+| T3.9 | e2e en CI | 3 tests Playwright existent, hors CI |
 
-→ Détail : `ROADMAP_REMEDIATION.md` §4.
+→ Détail : `ROADMAP_REMEDIATION.md` §5. **Après S3 : S4** (légal/RGPD, analytics, charge, Next 16).
 
 ---
 
@@ -131,15 +136,13 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 ---
 
-## 📋 Journal (append-only — 1 ligne par session, la plus récente en haut)
+## 📋 Journal (3 dernières sessions ; l'historique long est dans `SUIVI_PROJET.md` §9 + `git log`)
 
 | Date | Session | Fait | État après |
 |---|---|---|---|
+| 2026-07-17 | 4c | **S2 ✅ sauf Sentry.** Deps **36 → 2 advisories** (jose 3.4, FastAPI 0.111→0.139 / starlette 1.3.1, multipart 0.0.31, pillow 12.3) — les 3 atteignables sans auth ont disparu. CI : `build` (absent !) + couverture 60 % + `pip-audit` bloquants. **4 failles fermées** : vol de billet par écrasement de participant, fuite PII `/resend`, Turnstile silencieux, IP d'audit falsifiable. Pricing extrait (neutralité prouvée sur 399 602 prix). **153/153.** | S2 clos |
 | 2026-07-17 | 4b | **S1 ✅.** `payment.refunded` ignoré (billet valide après remboursement) → `refund_service` partagé. Gate Live : 3 défauts, 0 test → 10 tests. Upload : purge des orphelins + rate limit 20/h (NAT mobile CI). `/admin/database` : audit + `SUPER_ADMIN` + gardes ventes + intégrité FK → 13 tests. Doc recalée (`SUIVI_PROJET.md` devient un historique). **109/109.** ⚠️ J'ai reproduit le bug P1 en retirant `PAYDUNYA_*` de `config.py` — boot cassé, annulé. | **S1 clos** |
 | 2026-07-17 | 4 | **S1 T1.1 ✅ — GeniusPay câblé, 74/74 verts.** `_select_provider` (GeniusPay si clés, sinon stub + WARNING), `verify_webhook_signature` sur l'ABC en **fail-closed**, route `POST /webhooks/geniuspay` (signature HMAC corps brut + anti-rejeu 5 min + idempotence + livraison via BackgroundTasks = après commit). **4 écarts au contrat corrigés** en confrontant le code à la doc : `mobile_money` inexistant chez GeniusPay → `pawapay` ; `card` valide (remap inutile) ; objet `customer` absent ; min 200 XOF. **Frais réels** désormais stockés. Défaut de paiement inversé. **+41 tests**, mutation-testés. | S1 ~60 % (T1.1 clos) |
-| 2026-07-16 | 3 | **S0 ✅.** `.env` réparé → config charge. 97 fichiers en 5 commits, poussés → **travail sauvé** (0 secret, vérifié). **D1 tranchée : GeniusPay (GO).** Stack montée : `/health` 200. **3 bugs trouvés en exécutant** : migration `live_links_sent` manquante (live_notifier plantait en boucle) ; handler d'erreur de la réconciliation qui plante lui-même (`MissingGreenlet` sur instance expirée) ; tâche de livraison collectable par le GC. Tests : **20 échecs → 33/33 verts** (2 passages). Reste : ouvrir la PR (`gh` absent). | **S0 terminé** |
-| 2026-07-16 | 2 | Memory system activé (MemPalace wing + graphify). `iron-system` + superpowers installés. Nettoyage : nginx **rapaté** dans `infra/nginx/`, 6 fichiers périmés archivés → `Desktop/_farahevent_archive_2026-07-16/`, caches purgés. `ROADMAP_REMEDIATION.md` + `ETAT.md` créés. | S0 prêt à démarrer |
-| 2026-07-16 | 1 | Audit complet 11 dimensions → **5,5/10**, 5 bloquants vérifiés par exécution. | Audit livré |
 
 ---
 
