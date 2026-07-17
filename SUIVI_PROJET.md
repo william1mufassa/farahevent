@@ -16,7 +16,7 @@
 >
 > | Fichier | Rôle | Coût |
 > |---|---|---|
-> | [`ETAT.md`](ETAT.md) | **État vivant** — où on en est, quoi faire, pièges | ~1,9k tok |
+> | [`ETAT.md`](ETAT.md) | **État vivant** — où on en est, quoi faire, pièges | ~2,6k tok |
 > | [`ROADMAP_REMEDIATION.md`](ROADMAP_REMEDIATION.md) | Le plan — 5 sprints, gates, DoD | ~6k tok |
 > | `SUIVI_PROJET.md` (ici) | **Historique & décisions** — pourquoi les choix ont été faits | ~7k tok |
 >
@@ -30,7 +30,7 @@
 > Ce qu'elle annonçait est fait : le travail décrit ci-dessous a été commité et poussé
 > le 2026-07-16 (branche `chantier/live-delivery-admin`), PayDunya est abandonné au
 > profit de **GeniusPay** (câblé le 2026-07-17), et la suite est passée de 33 à
-> **109 tests**.
+> **153 tests**.
 
 **Dernier commit poussé** : `a9f19b1` — `test(e2e): tunnel d'achat Playwright + point de reprise suivi` (branche `main`, poussé en début de session 3).
 
@@ -117,8 +117,17 @@ Depuis, on a durci le socle, complété des morceaux critiques du paiement, et *
 frontend au vrai backend** (l'admin pilote un événement, le client le voit et peut acheter, avec
 de vraies données de bout en bout).
 
-**Reste bloquant avant prod** : tests automatisés, PayDunya (paiement digital), CI, et le
-durcissement DevOps (voir §6 et §7).
+**Reste bloquant avant prod** (état au 2026-07-17 — voir [`ETAT.md`](ETAT.md)) :
+1. **Livraison des billets sans retry** — client payé + Resend indisponible = billet jamais reçu.
+   Le vrai risque du jour J (T3.10).
+2. **Aucun backup** — une billetterie sans sauvegarde perd la liste des payants.
+3. **Aucune observabilité** — Sentry différé : rien ne dira ce qui casse.
+4. **Pas déployable** — ni `compose.prod`, ni Dockerfile frontend ; le backend tourne en root.
+5. **Clés GeniusPay à poser** — le digital est câblé mais le stub reste actif tant qu'elles
+   manquent (le boot le logge).
+
+*Résolus depuis l'audit : tests (33 → 153), CI (build + couverture + `pip-audit` bloquants),
+dépendances (36 → 2 advisories), paiement digital (câblé), 4 failles de sécurité.*
 
 ---
 
@@ -177,12 +186,12 @@ npm --prefix e2e run test
 
 | # | Chantier | État |
 |---|---|---|
-| 1 | Sécurité socle | 🟡 **Repris** — le socle tenait, mais l'audit du 2026-07-16 a trouvé 36 advisories Python (jose/multipart/starlette atteignables sans auth), l'écrasement de participant, une fuite PII sur `/tickets/resend`. Corrigés depuis : `/admin/database` (audit + RBAC), upload borné, gate Live. **Reste : dépendances (S2)** |
-| 2 | Paiement complet | 🟡 **GeniusPay câblé** (2026-07-17) — provider + webhook signé + 41 tests. `payment.refunded` traité (il était ignoré : le billet restait valide après remboursement). **Reste : poser les clés + tunnel pour tester en local** |
+| 1 | Sécurité socle | 🟢 **Terminé (S2)** — 36 → **2 advisories** (les 3 atteignables sans auth ont disparu) ; écrasement de participant, fuite PII, Turnstile silencieux et IP d'audit falsifiable : fermés. Reste : sanitisation backend + Next 16 (S4) |
+| 2 | Paiement complet | 🟡 **GeniusPay câblé** — provider + webhook signé + 41 tests ; `payment.refunded` traité. Barème des frais extrait et testé. **Reste : poser les clés (+ le `whsec_` sandbox) et un tunnel pour tester en local** |
 | 3 | Intégration front↔back | 🟢 **Terminé** (admin + public + WS temps réel + ISR étendue + next/image ; reste : endpoint comms externe) |
 | 4 | Livraison billets & comms | 🟡 **email_service (Resend) + WhatsApp écrits** — mais **AUCUN retry** : client payé + Resend down = billet jamais reçu. C'est le vrai risque du jour J (T3.10) |
-| 5 | DevOps / prod | 🔴 À faire (compose prod, Dockerfile front, nginx/SSL, backups) |
-| 6 | Tests & QA | 🟡 **109 tests verts** (33 → 109). ⚠️ Les « 32 tests verts » annoncés jusqu'ici étaient **faux** : à la première exécution réelle, la suite était à **20 échecs**. Reste : e2e en CI, charge, couverture |
+| 5 | DevOps / prod | 🔴 **S3 — le prochain sprint.** compose prod, Dockerfile front (le back tourne en **root**), nginx/SSL, **backups (aucun)**, `/health` réel, limiter Redis. ⏸️ Sentry différé : **rien ne dira ce qui casse en prod** |
+| 6 | Tests & QA | 🟢 **153 tests verts** (33 → 153), les nouveaux **mutation-testés**. CI : `build` + couverture **60 %** + `pip-audit` **bloquants**. ⚠️ Les « 32 verts » annoncés jusqu'ici étaient **faux** : à la 1ʳᵉ exécution réelle, la suite était à **20 échecs**. Reste : e2e en CI, tests de charge |
 | 7 | Déploiement + docs + formation | 🔴 À faire |
 | v2 | Streaming live | 🟡 **Plus différé** — `live.py`, `live_notifier`, pages front existent. Le gate d'accès a été réparé (3 défauts, 0 test auparavant) |
 
@@ -381,7 +390,7 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 
 | Sujet | État |
 |---|---|
-| Tests automatisés | 🟢 **109 tests backend verts** (33 → 109), les nouveaux **mutation-testés** ; + Playwright e2e (3) ; restent **e2e-en-CI + charge + couverture** |
+| Tests automatisés | 🟢 **153 tests backend verts** (33 → 153), les nouveaux **mutation-testés** ; couverture **64 %** (seuil CI 60 %) ; + Playwright e2e (3) ; restent **e2e-en-CI + tests de charge** |
 | **Suite aveugle aux migrations oubliées** | 🔴 `conftest` construit le schéma via `Base.metadata.create_all` (modèle), jamais via Alembic → prod cassée / CI verte. Angle mort structurel |
 | **Pas de mock des dépendances externes** | 🟠 un test joignait la prod ; neutralisé au cas par cas, aucune stratégie globale |
 | **Livraison sans retry** (`send_tickets_bg`) | 🔴 client payé + Resend down = billet jamais reçu, seule alerte = notif WS en direct. **Vrai risque du jour J** (T3.10) |
@@ -427,6 +436,44 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 ---
 
 ## 9. Changelog
+
+### 2026-07-17 — Sprint S2 : durcissement (153 tests, 36 → 2 advisories)
+- **Dépendances : 36 → 2 advisories.** `python-jose` 3.3→3.4 (confusion d'algo + DoS ; c'est la
+  brique qui signe l'auth admin ET les billets QR). `fastapi` 0.111→**0.139.2** : 0.111 épinglait
+  `starlette` 0.37 et ses 9 advisories ; starlette 1.3.1 les lève toutes. `python-multipart`
+  0.0.9→0.0.31 (7 advisories, DoS atteignable via l'upload public). `Pillow` 11.1→12.3.
+  **Les 3 paquets atteignables sans authentification ont disparu.** Le saut de 28 versions
+  mineures de FastAPI est passé sans une casse — les 109 tests ont servi exactement à ça.
+  **2 restantes, bloquées et documentées** : `ecdsa` (aucun correctif publié) et `pyasn1`
+  (0.6.3 existe mais `python-jose` épingle `pyasn1<0.5.0` — vérifié, le forcer casse la
+  résolution). Vrai correctif = migrer vers **PyJWT**, qui ne dépend ni de l'un ni de l'autre.
+- **CI qui mord.** `npm run build` **ajouté** — il manquait : lint et typecheck ne compilent pas,
+  une régression de build passait la CI et n'apparaissait qu'au déploiement. Couverture mesurée
+  (**64 % réel**) → seuil bloquant à 60 %. `pip-audit` bloquant, ajouté **après** le nettoyage
+  (un scan branché sur une CI rouge se fait désactiver dans la semaine). `npm audit` non bloquant
+  et assumé : les 4 high de Next 14 n'ont aucun correctif en 14.x.
+- **4 failles fermées**, toutes exploitables avec pour seule connaissance **l'email d'un acheteur** :
+  - *Vol de billet par écrasement de participant* — `_upsert_participant` réécrivait le `whatsapp`
+    d'un acheteur ayant déjà payé ; la re-livraison partait chez l'attaquant. Coordonnées **gelées**
+    dès qu'un billet existe (la correction avant paiement reste permise — c'est testé).
+  - *Fuite PII sur `/tickets/resend`* — la réponse renvoyait email **et téléphone en clair**.
+    Masqués. + joker `ILIKE` fermé (`order_id="%"` matchait n'importe quel billet).
+  - *Turnstile silencieux* — `verify` fait `if not self.enabled: return True` : sans clé, **tout
+    jeton passe**, sans le moindre log. Exigé par le boot-guard en prod (qui gagne 12 tests, il
+    n'en avait aucun).
+  - *IP d'audit inutile et falsifiable* — le proxy BFF ne relayait rien (toutes les actions
+    portaient l'IP du serveur Next) et le backend lisait `x-forwarded-for` **brut**, que nginx
+    **ajoute** : la 1ʳᵉ entrée vient du client. On fait désormais confiance à `X-Real-IP`, qu'nginx
+    **écrase** avec `$remote_addr`.
+- **Garde anti-mock au build** — `next.config.mjs` refuse un build prod avec `USE_MOCK=1`
+  (fixtures servies + garde admin désactivée). Next inline les `NEXT_PUBLIC_*` au build : le
+  comportement est figé dans le bundle.
+- **Barème des frais extrait** dans `pricing_service` — il vivait dans le handler HTTP, donc
+  n'était pas testé alors qu'il décide de ce que l'acheteur paie. Neutralité du refactor prouvée
+  sur 399 602 prix (0 écart). *NB : le `float` sur l'argent n'était **pas** un bug — 0 écart
+  contre un calcul Decimal exact sur la même plage. Une odeur, pas une faute.*
+- ⏸️ **Sentry différé** (décision du 2026-07-17). Assumé, mais **rien ne dira ce qui casse en
+  prod** — à reprendre avant le 1er événement.
 
 ### 2026-07-17 — Sprint S1 : GeniusPay câblé, Live réparé, destruction tracée (109 tests)
 - **GeniusPay branché** (D1 : PayDunya abandonné). Le provider existait, bien écrit, mais
