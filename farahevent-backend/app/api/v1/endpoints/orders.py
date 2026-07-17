@@ -173,7 +173,17 @@ async def create_order(
 
 
 @router.post("/{order_id}/manual-payment", status_code=status.HTTP_201_CREATED)
+# Endpoint PUBLIC qui écrit sur disque : sans limite, une seule commande légitime
+# suffisait à marteler l'upload et saturer le volume. C'est aussi le chemin
+# d'exploitation des CVE de parsing multipart (python-multipart / starlette).
+#
+# 20/h et pas 3/h : les opérateurs mobiles ivoiriens font du NAT massif — des
+# dizaines d'acheteurs partagent une même IP publique. Une limite serrée
+# bloquerait des clients réels le jour J. La vraie borne disque, c'est la purge
+# des reçus orphelins ci-dessous ; ceci n'est qu'une défense en profondeur.
+@limiter.limit("20/hour")
 async def submit_manual_payment(
+    request: Request,
     order_id: str,
     operator: str = Form(..., description="western_union / ria / moneygram / other"),
     sender_name: str = Form(..., min_length=1, max_length=200),
@@ -210,12 +220,19 @@ async def submit_manual_payment(
     receipt_url = await upload_service.save_receipt(receipt)
 
     if existing_mp:
-        # Écrase la preuve précédente qui était encore en pending
+        # Écrase la preuve précédente qui était encore en pending.
+        # Purge l'ancien fichier : sans cela, chaque re-soumission laissait un
+        # fichier de 5 Mo que plus rien ne référençait — croissance disque non
+        # bornée sur un endpoint public. Best-effort : ne casse jamais la
+        # soumission d'un acheteur qui a payé.
+        old_key = existing_mp.receipt_image_url
         existing_mp.operator = operator
         existing_mp.sender_name = sender_name
         existing_mp.sender_country = sender_country
         existing_mp.receipt_image_url = receipt_url
         manual_payment = existing_mp
+        if old_key and old_key != receipt_url:
+            await upload_service.delete_receipt(old_key)
     else:
         manual_payment = ManualPayment(
             order_id=order.id,
