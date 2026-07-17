@@ -29,7 +29,7 @@ participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REM
 | Config charge | ✅ **OUI** | `.env` réécrit en UTF-8 (53 octets nuls retirés) |
 | Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
 | Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
-| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 12 commits, sur `origin` — **jamais mergée sur `main`** |
+| Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 18 commits, sur `origin` — **jamais mergée sur `main`** |
 | Tests | ✅ **109/109** | vérifié le 2026-07-17. 33 → 109. Tous les nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
 | CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
 | Encaissement digital | 🟡 **câblé, clés absentes** | code + webhook + 41 tests ✅. Clés absentes du `.env` → **le boot logge « Paiement digital : STUB actif »** (vérifié). Dès que les clés sont posées, le log passe à « GeniusPay (mode=test) » — c'est le témoin à regarder |
@@ -42,20 +42,26 @@ participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REM
 
 ---
 
-## ▶️ Sprint S1 — reste à faire
+## ▶️ Sprint S2 — durcissement (prochain)
 
-**D1 tranchée (2026-07-16) : GeniusPay. PayDunya abandonné.** Câblage fait (T1.1 ✅).
+**S1 clos le 2026-07-17** : GeniusPay câblé + webhook signé, `payment.refunded` traité,
+gate Live réparé, upload borné, `/admin/database` sécurisé, doc recalée. 109 tests.
 
 | # | Action | Détail |
 |---|---|---|
-| **Vous** | Poser les clés sandbox dans `.env` (le boot logge le provider actif) | `GENIUSPAY_API_KEY` / `SECRET_KEY` / `WEBHOOK_SECRET`. ⚠️ éditeur UTF-8, jamais `Add-Content`. ⚠️ le `whsec_` sandbox **diffère** de celui de prod |
+| **Vous** | Poser les clés sandbox dans `.env` | ⚠️ éditeur UTF-8, jamais `Add-Content`. ⚠️ le `whsec_` **sandbox** diffère de celui de prod. Témoin : le boot logge le provider actif |
 | **Vous** | Régénérer les clés **live** | elles ont transité en clair dans un canal journalisé le 2026-07-16 |
-| T1.2 | Gate Live | `live.py:69` exclut `MANUAL_VALIDATED` ; l. 73 teste `event.mode` au lieu de `formula.channel` |
-| T1.3 | Rate limit upload | `/orders/{id}/manual-payment` : upload anonyme sans limite, fichiers orphelins |
-| T1.4 | `/admin/database` | audit_service + `SUPER_ADMIN` sur hard-delete + tests |
-| T1.5 | `SUIVI_PROJET.md` | encore PayDunya, ignore Live/email/database |
+| **Vous** | Ouvrir la PR | la CI ne tourne que sur `main` ou PR→`main` (`gh` absent ici) |
+| T2.1 | `python-jose` → 3.4.0 | confusion d'algo + DoS ; signe l'auth admin ET les billets QR |
+| T2.2 | `python-multipart` + `starlette` | DoS multipart **atteignable sans auth** ; implique de bumper FastAPI |
+| T2.3 | Écrasement de participant | `orders.py` `_upsert_participant` écrase `whatsapp` depuis une entrée anonyme |
+| T2.4 | Fuite PII `/tickets/resend` | renvoie le WhatsApp en clair + même joker ILIKE (déjà fermé sur `/live/access`) |
+| T2.5 | Turnstile dans le boot-guard | no-op silencieux si la clé est vide, même en prod |
+| T2.6 | XFF dans le proxy BFF | le backend logge l'IP du serveur Next, pas celle de l'admin |
+| T2.8 | CI qui mord | `npm run build` (absent !), `pip-audit`, `npm audit`, couverture |
+| T2.9 | Sentry | zéro observabilité aujourd'hui |
 
-→ Détail : `ROADMAP_REMEDIATION.md` §3.
+→ Détail : `ROADMAP_REMEDIATION.md` §4.
 
 ---
 
@@ -68,9 +74,9 @@ participant, fuite PII `/tickets/resend`, CI qui mord, Sentry. Voir `ROADMAP_REM
 | « Pourquoi X ? », « où est Y ? » | `mempalace search "..."` — wing `farahevent_main`, 1885 tiroirs | ~200 tok |
 | Findings d'audit détaillés | `mempalace search "audit"` — room `audit`, 11 tiroirs verbatim | ~400 tok |
 | « Qui dépend de X ? » | `graphify explain "X"` / `graphify path "A" "B"` | ~200 tok |
-| Carte du code | `graphify-out/GRAPH_REPORT.md` — 1763 nœuds / 4189 arêtes (rebâti 2026-07-17) | ~800 tok |
+| Carte du code | `graphify-out/GRAPH_REPORT.md` — 1839 nœuds / 4351 arêtes (rebâti 2026-07-17) | ~800 tok |
 | Le plan | `ROADMAP_REMEDIATION.md` — 5 sprints, gates, DoD | ~3k tok |
-| Historique/contexte | `SUIVI_PROJET.md` — ⚠️ **périmé, voir pièges** | 7k tok |
+| **Pourquoi** d'une décision | `SUIVI_PROJET.md` — historique recalé le 2026-07-17 ; ne fait plus autorité sur l'état | 7k tok |
 
 Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
@@ -78,21 +84,28 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 ## ⚠️ Pièges anti-hallucination — lire avant de croire quoi que ce soit
 
-1. **`SUIVI_PROJET.md` a dérivé du code** (T1.5 le corrigera). Il cite **PayDunya** (le code a
-   **GeniusPay**) et ignore Live / `email_service` / `admin/database.py`. Il affirmait aussi
-   « Chantier 3 terminé & validé end-to-end » pour du code non commité, sur une app qui ne
-   démarrait pas — vrai à un instant T, faux au suivant. **Vérifier dans le code, toujours.**
+> Les pièges **résolus** sont retirés d'ici (ils restent dans les messages de commit et
+> dans MemPalace, room `audit`). Ce fichier ne paie que ce qui peut encore mordre.
+
+1. **Aucun document ne fait autorité sur l'état, sauf CE fichier.** `SUIVI_PROJET.md` a été
+   recalé (2026-07-17) et rétrogradé en **historique** : il porte le *pourquoi* des décisions,
+   plus l'état. Il avait dérivé sans bruit — PayDunya alors que le code avait GeniusPay,
+   « validé end-to-end » pour du code non commité. Chaque phrase était vraie quand écrite :
+   c'est le mode de défaillance. **Vérifier dans le code, toujours.**
 2. **Les commentaires mentent aussi.** `sanitize.ts` affirme « le backend sanitise à l'entrée » →
    **faux**, zéro sanitisation backend, aucune lib dans `requirements.txt`.
-3. **« 32 tests verts »** décrit un état non commité. Compter soi-même : `bash run_tests.sh`.
-4. **Ne PAS conclure à un bug d'enum** dans `live.py` : `OrderStatus` hérite de `str`, la comparaison
-   `str`/`Enum` est **correcte**. Le bug est l'oubli de `MANUAL_VALIDATED`.
-5. **Vulns npm : la menace réelle < le chiffre brut.** 2 des 4 high visent l'Image Optimization
+3. **Ne jamais croire un compte de tests écrit dans un doc.** « 32 verts » annoncés → la suite
+   était en réalité à **20 échecs** au premier lancement réel. Compter soi-même : `bash run_tests.sh`.
+4. **Vulns npm : la menace réelle < le chiffre brut.** 2 des 4 high visent l'Image Optimization
    (neutralisée par `images.unoptimized=true`), le « Middleware bypass » vise le Pages Router
    (le projet est en App Router).
-6. **Le dépôt est imbriqué à 4 niveaux.** Racine git réelle =
-   `farahevent-main (2)/farahevent-main/farahevent-main/farahevent-main`. Correctif propre : après S0,
-   `git clone` vers un chemin sain.
+5. **Le dépôt est imbriqué à 4 niveaux.** Racine git réelle =
+   `farahevent-main (2)/farahevent-main/farahevent-main/farahevent-main`. Correctif propre :
+   `git clone` vers un chemin sain (le travail est poussé, c'est sans risque).
+6. **Ne PAS retirer les réglages `PAYDUNYA_*` de `config.py`** bien qu'aucun code ne les lise :
+   les `.env` les contiennent encore et pydantic refuse les champs extra → **boot cassé**
+   (vérifié le 2026-07-17, même mode de défaillance que le `.env` corrompu). Purger les `.env`
+   D'ABORD, supprimer les champs ENSUITE.
 7. **`.env.local` a `USE_MOCK=1`** et Next **charge `.env.local` en prod**. Sain en `git clone`
    (gitignoré), dangereux en copie de dossier. **Déployer par git, jamais par copie.**
 8. **La suite de tests ne peut PAS détecter une migration oubliée.** `conftest.py:34` construit le
@@ -103,8 +116,6 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
    Une base de test périmée + `create_all` (qui n'altère jamais une table existante) = échecs
    fantômes. En cas d'échecs massifs après un changement de modèle : `DROP DATABASE farahevent_test`
    puis relancer.
-10. **Un test appelait le VRAI serveur OpenWA de production.** Neutralisé par une fixture dans
-    `test_reconciliation.py`. Aucune stratégie de mock globale des dépendances externes n'existe.
 
 ---
 
