@@ -33,8 +33,10 @@ def _geniuspay_active(monkeypatch):
     """
     monkeypatch.setattr(settings, "GENIUSPAY_WEBHOOK_SECRET", _SECRET)
     monkeypatch.setattr(webhooks, "payment_provider", GeniusPayProvider())
-    with patch("app.services.ticket_service.TicketService.send_tickets_bg"):
-        yield
+    # Plus rien à neutraliser côté envoi : depuis T3.10, l'émission d'un billet
+    # se contente de METTRE EN FILE la livraison (outbox). Aucun appel réseau ne
+    # part pendant la requête — c'est la boucle de fond qui livre.
+    yield
 
 
 def _sign(body: bytes, ts: str, secret: str = _SECRET) -> str:

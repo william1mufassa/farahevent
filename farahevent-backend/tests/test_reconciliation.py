@@ -8,26 +8,6 @@ from app.services.reconciliation_service import reconcile_pending_orders
 from tests.factories import make_event, make_formula, make_order, make_participant
 
 
-@pytest.fixture(autouse=True)
-def _no_real_delivery():
-    """Neutralise la livraison des billets pendant ces tests.
-
-    `reconcile_pending_orders` lance `send_tickets_bg` en fire-and-forget
-    (`asyncio.create_task`). Sans ce mock, la tâche s'échappe du test et
-    appelle le **vrai** serveur OpenWA de production (wa.farahevent.tech), puis
-    touche la base hors du contexte de session (MissingGreenlet). Ces tests
-    portent sur la réconciliation, pas sur la livraison.
-
-    ⚠ Le mock masque un défaut réel, à traiter en T3.10 : la tâche est créée
-    AVANT le commit de la transaction. Si elle gagne la course, `send_tickets_bg`
-    ouvre sa propre session, ne voit aucun billet et sort sur `if not tickets:
-    return` — le client paie et ne reçoit jamais rien, sans trace. La référence
-    de la tâche n'est pas conservée non plus (risque de GC en plein vol).
-    """
-    with patch("app.services.ticket_service.TicketService.send_tickets_bg"):
-        yield
-
-
 class _FakeProvider:
     async def get_status(self, checkout_id):
         if checkout_id.startswith("PAID"):

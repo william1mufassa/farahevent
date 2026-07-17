@@ -12,7 +12,6 @@ PENDING orphelines et résout leur état :
 Provider-agnostique : utilise `PaymentProvider.get_status`, qui doit renvoyer un
 statut NORMALISÉ dans {"pending", "paid", "failed"}.
 """
-import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -25,11 +24,6 @@ from app.services.payment_provider import payment_provider as default_provider
 from app.services.ticket_service import StockExceededError, ticket_service
 
 logger = logging.getLogger(__name__)
-
-# asyncio.create_task ne garde qu'une référence FAIBLE à la tâche : sans cette
-# ancre, le GC peut la collecter en plein vol et la livraison du billet
-# disparaîtrait silencieusement (comportement documenté de asyncio).
-_delivery_tasks: set[asyncio.Task] = set()
 
 # Laisser au webhook le temps d'arriver avant de réconcilier.
 MIN_AGE_SECONDS = 180  # 3 min
@@ -77,7 +71,6 @@ async def reconcile_pending_orders(
                     order.status = OrderStatus.PAID.value
                     try:
                         await ticket_service.generate_for_order(order, db)
-                        _schedule_delivery(str(order_id))
                     except StockExceededError:
                         # Cas limite : payé mais stock épuisé entre-temps → alerte pour
                         # traitement manuel (remboursement). L'order reste PAID.
@@ -106,16 +99,3 @@ async def reconcile_pending_orders(
     return counts
 
 
-def _schedule_delivery(order_id: str) -> None:
-    """Programme l'envoi des billets, en gardant une référence à la tâche.
-
-    ⚠ DETTE — à traiter en T3.10 (ROADMAP_REMEDIATION.md) : la tâche est lancée
-    AVANT le commit de la transaction appelante (main.py commit après l'appel).
-    `send_tickets_bg` ouvre sa PROPRE session ; si elle gagne la course, elle ne
-    voit pas encore les billets et sort sur `if not tickets: return` — le client
-    paie et ne reçoit jamais rien, sans trace. Le correctif de fond est une file
-    (Redis + retry/DLQ) alimentée après commit, pas un fire-and-forget.
-    """
-    task = asyncio.create_task(ticket_service.send_tickets_bg(order_id))
-    _delivery_tasks.add(task)
-    task.add_done_callback(_delivery_tasks.discard)

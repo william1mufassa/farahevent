@@ -1,10 +1,16 @@
 """Génération des billets après paiement validé.
 
 Appelé par :
-- le webhook PayDunya (Sprint 5) quand un paiement digital est confirmé,
-- l'endpoint admin validate-manual-payment (Sprint 4) quand un paiement manuel est validé.
+- le webhook GeniusPay (`POST /webhooks/geniuspay`) quand un paiement est confirmé,
+- `admin/manual-payments/{id}/validate` quand un paiement manuel est validé,
+- la réconciliation, quand un webhook s'est perdu.
 
-Idempotent : si les tickets existent déjà pour la commande, ils sont retournés tels quels.
+Idempotent : si les billets existent déjà pour la commande, ils sont retournés tels quels.
+
+L'émission **programme aussi la livraison** (`delivery_service.enqueue_for_order`)
+dans la MÊME transaction : le billet et son job de livraison commitent ensemble.
+C'est ce qui garantit qu'un billet émis sera livré — l'ancien envoi en
+fire-and-forget pouvait partir avant le commit et ne rien voir (T3.10).
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,142 +127,18 @@ class TicketService:
         if tickets:
             formula.sold_quantity += 1
 
+            # Livraison programmée DANS CETTE TRANSACTION (T3.10). C'est le point
+            # clé : le job et le billet commitent ensemble. Aucune fenêtre où l'un
+            # existe sans l'autre — l'ancien `create_task` partait avant le commit
+            # et pouvait ne rien voir. Ici, si la commande rollback, le job
+            # n'existe pas ; si elle commit, la livraison est garantie d'être
+            # tentée, et retentée.
+            from app.services.delivery_service import enqueue_for_order
+
+            await enqueue_for_order(db, order, participant)
+
         await db.flush()
         return tickets
-
-    async def send_tickets_bg(self, order_id: str) -> None:
-        """Envoie les billets générés (Email + WhatsApp). Crée sa propre session DB."""
-        from app.core.database import AsyncSessionLocal
-        from app.services.email_service import email_service
-        from app.services.whatsapp_service import whatsapp_service
-        import uuid
-        
-        try:
-            parsed_id = uuid.UUID(str(order_id))
-        except (ValueError, TypeError):
-            return
-
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(Order, Participant, Event, Formula)
-                .join(Participant, Participant.id == Order.participant_id)
-                .join(Event, Event.id == Order.event_id)
-                .join(Formula, Formula.id == Order.formula_id)
-                .where(Order.id == parsed_id)
-            )
-            row = result.first()
-            if not row:
-                return
-                
-            order, participant, event, formula = row
-            
-            tickets_result = await db.execute(select(Ticket).where(Ticket.order_id == order.id))
-            tickets = tickets_result.scalars().all()
-            if not tickets:
-                return
-
-            event_date = event.date.strftime("%d/%m/%Y %H:%M") if event.date else ""
-            event_venue = event.location or "En ligne"
-            
-            email_sent = None
-            wa_sent = None
-            
-            for ticket in tickets:
-                if ticket.type == TicketType.QR.value or ticket.type == TicketType.LIVE_LINK.value:
-                    # On envoie un seul message par participant, donc on le fait lors du traitement du billet principal
-                    if ticket.type == TicketType.LIVE_LINK.value and any(t.type == TicketType.QR.value for t in tickets):
-                        continue # Eviter le double envoi si la formule est BOTH
-
-                    pref = participant.ticket_delivery_pref
-                    
-                    # Generer le lien du live si applicable
-                    stream_link = f"https://farahevent.tech/live/{event.slug}" if formula.channel in (FormulaChannel.ONLINE.value, FormulaChannel.BOTH.value) else None
-                    
-                    # 1. Email
-                    if pref in (TicketDeliveryPref.EMAIL.value, TicketDeliveryPref.BOTH.value):
-                        email_sent = await email_service.send_ticket_confirmation(
-                            email=participant.email,
-                            buyer_name=participant.full_name,
-                            event_title=event.name,
-                            event_date=event_date,
-                            event_venue=event_venue,
-                            ticket_category=formula.name,
-                            ticket_id=str(ticket.id),
-                            qr_code_base64=ticket.qr_image_url or "",
-                            stream_link=stream_link,
-                            amount=order.amount
-                        )
-                    
-                    # 2. WhatsApp
-                    if pref in (TicketDeliveryPref.WHATSAPP.value, TicketDeliveryPref.BOTH.value):
-                        wa_sent = await whatsapp_service.send_ticket_confirmation(
-                            phone=participant.whatsapp,
-                            buyer_name=participant.full_name,
-                            event_title=event.name,
-                            event_date=event_date,
-                            event_venue=event_venue,
-                            ticket_category=formula.name,
-                            ticket_id=str(ticket.id),
-                            qr_code_base64=ticket.qr_image_url or "",
-                            stream_link=stream_link,
-                            amount=order.amount
-                        )
-                elif ticket.type == TicketType.LIVE_LINK.value:
-                    # Traité ci-dessus
-                    pass
-
-            # Mettre à jour les métadonnées de la commande avec l'accusé de réception
-            for ticket in tickets:
-                if ticket.type == TicketType.QR.value:
-                    if email_sent is True:
-                        ticket.email_delivery_status = "sent"
-                    elif email_sent is False:
-                        ticket.email_delivery_status = "failed"
-                        ticket.delivery_error_log = (ticket.delivery_error_log or "") + "[Email] Failed\n"
-                    
-                    if wa_sent is True:
-                        ticket.whatsapp_delivery_status = "sent"
-                    elif wa_sent is False:
-                        ticket.whatsapp_delivery_status = "failed"
-                        ticket.delivery_error_log = (ticket.delivery_error_log or "") + "[WhatsApp] Failed\n"
-                
-                db.add(ticket)
-
-            if email_sent is not None or wa_sent is not None:
-                current_meta = dict(order.metadata_ or {})
-                delivery = current_meta.get("delivery_status", {})
-                if email_sent is not None:
-                    delivery["email_sent"] = email_sent
-                if wa_sent is not None:
-                    delivery["whatsapp_sent"] = wa_sent
-                current_meta["delivery_status"] = delivery
-                order.metadata_ = current_meta
-                
-                db.add(order)
-
-            await db.commit()
-
-            # Notifier l'admin en temps réel en cas d'échec (Accusé de réception d'échec)
-            from app.services.notification_hub import notification_hub, ticket_delivery_failure_notification
-            for ticket in tickets:
-                if email_sent is False:
-                    await notification_hub.broadcast({
-                        "type": "notification",
-                        "notification": ticket_delivery_failure_notification(
-                            ticket_id=str(ticket.id),
-                            participant_name=participant.full_name,
-                            channel="Email"
-                        )
-                    })
-                if wa_sent is False:
-                    await notification_hub.broadcast({
-                        "type": "notification",
-                        "notification": ticket_delivery_failure_notification(
-                            ticket_id=str(ticket.id),
-                            participant_name=participant.full_name,
-                            channel="WhatsApp"
-                        )
-                    })
 
 
 ticket_service = TicketService()

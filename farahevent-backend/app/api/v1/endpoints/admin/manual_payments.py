@@ -172,7 +172,8 @@ async def validate_manual_payment(
         raise HTTPException(status_code=409, detail=str(e))
 
     # Envoi asynchrone des billets
-    background_tasks.add_task(ticket_service.send_tickets_bg, str(order.id))
+    # Livraison programmée par `generate_for_order` dans cette transaction (outbox,
+    # T3.10) : la boucle de fond s'en charge, avec retry.
 
     await audit_service.log(
         db, admin=admin, action="manual_payment.validate",

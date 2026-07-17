@@ -2,6 +2,7 @@
 from app.models.admin import Admin
 from app.models.audit_log import AuditLog
 from app.models.chatbot_faq import ChatbotFaq
+from app.models.delivery_job import DeliveryJob
 from app.models.email_automation import EmailAutomation
 from app.models.event import Event
 from app.models.event_content import EventContent
@@ -18,6 +19,7 @@ __all__ = [
     "Admin",
     "AuditLog",
     "ChatbotFaq",
+    "DeliveryJob",
     "EmailAutomation",
     "Event",
     "EventContent",

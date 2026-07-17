@@ -12,9 +12,11 @@ from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.api.v1.router import api_router
 from app.core.database import engine, AsyncSessionLocal
+from app.services.email_service import email_service
 from app.services.whatsapp_service import whatsapp_service
 from app.services.turnstile_service import turnstile_service
 from app.services.revalidate_service import revalidate_service
+from app.services.delivery_service import process_due_jobs
 from app.services.reconciliation_service import reconcile_pending_orders
 from app.services.live_notifier import live_notifier_loop
 
@@ -25,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 # Intervalle du job de réconciliation des paiements (CDC §2.2.2).
 RECONCILE_INTERVAL_SECONDS = 300
+
+# Livraison des billets : intervalle court. Un acheteur qui vient de payer attend
+# son billet — 20 s est le délai maximal ajouté au chemin nominal. Le retry, lui,
+# est porté par `next_attempt_at` (backoff), pas par cet intervalle.
+DELIVERY_INTERVAL_SECONDS = 20
 
 
 async def _reconciliation_loop() -> None:
@@ -47,16 +54,40 @@ async def _reconciliation_loop() -> None:
             logger.exception("Boucle de réconciliation: erreur, on poursuit")
 
 
+async def _delivery_loop() -> None:
+    """Boucle de livraison des billets (T3.10).
+
+    Sûre en multi-worker, contrairement à la réconciliation : `claim_due_jobs`
+    verrouille en `FOR UPDATE SKIP LOCKED`, donc deux workers ne prendront jamais
+    le même job. Le commit à chaque tour rend le progrès durable — un redémarrage
+    en plein vol ne perd rien, les jobs restants sont toujours `pending` en base.
+    """
+    while True:
+        await asyncio.sleep(DELIVERY_INTERVAL_SECONDS)
+        try:
+            async with AsyncSessionLocal() as db:
+                counts = await process_due_jobs(db)
+                await db.commit()
+            if counts["claimed"]:
+                logger.info("Livraison billets: %s", counts)
+        except Exception:
+            logger.exception("Boucle de livraison: erreur, on poursuit")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     reconciliation_task = asyncio.create_task(_reconciliation_loop())
+    delivery_task = asyncio.create_task(_delivery_loop())
     live_notifier_task = asyncio.create_task(live_notifier_loop())
     yield
     reconciliation_task.cancel()
+    delivery_task.cancel()
     live_notifier_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await reconciliation_task
+        await delivery_task
         await live_notifier_task
+    await email_service.aclose()
     await whatsapp_service.aclose()
     await turnstile_service.aclose()
     await revalidate_service.aclose()

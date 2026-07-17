@@ -22,7 +22,7 @@ import logging
 import time
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,7 +53,6 @@ _REFUNDED_STATUSES = {"refunded"}
 @router.post("/geniuspay", status_code=status.HTTP_200_OK)
 async def geniuspay_webhook(
     request: Request,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Notification de paiement GeniusPay → commande PAID + émission du billet."""
@@ -174,10 +173,9 @@ async def geniuspay_webhook(
             "warning": "sold_out",
         }
 
-    # Livraison après la réponse (donc après le commit de get_db) : send_tickets_bg
-    # ouvre sa PROPRE session et ne verrait pas les billets si elle partait avant.
-    # C'est la course décrite en T3.10 — évitée ici via BackgroundTasks.
-    background_tasks.add_task(ticket_service.send_tickets_bg, str(parsed_id))
-
+    # Pas d'envoi ici : `generate_for_order` a programmé la livraison dans CETTE
+    # transaction (outbox, T3.10). La boucle de fond la prendra en charge et la
+    # retentera. Plus de BackgroundTasks : la garantie vient du commit, pas de
+    # l'ordre d'exécution.
     logger.info("Webhook GeniusPay: commande %s → PAID, billets émis", parsed_id)
     return {"received": True, "handled": True, "status": order.status}

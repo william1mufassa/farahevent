@@ -23,12 +23,6 @@ _VICTIM_PHONE = "+2250700000000"
 _ATTACKER_PHONE = "+2250799999999"
 
 
-@pytest.fixture(autouse=True)
-def _no_real_delivery():
-    with patch("app.services.ticket_service.TicketService.send_tickets_bg"):
-        yield
-
-
 @pytest_asyncio.fixture
 async def event(db):
     ev = await make_event(db)

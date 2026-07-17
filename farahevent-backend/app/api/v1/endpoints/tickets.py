@@ -236,11 +236,12 @@ async def resend_ticket(
             detail="Aucun billet trouvé pour cette commande — contactez le support",
         )
 
-    from app.services.ticket_service import ticket_service
-    background_tasks.add_task(
-        ticket_service.send_tickets_bg,
-        str(order.id)
-    )
+    # Re-programme la livraison : les jobs précédents sont `sent` ou `failed`, on
+    # les remet en `pending` plutôt que d'envoyer en direct — l'acheteur profite
+    # ainsi du même retry que la première fois.
+    from app.services.delivery_service import requeue_for_order
+
+    await requeue_for_order(db, order, participant)
 
     # Coordonnées MASQUÉES dans la réponse. L'endpoint est anonyme : il suffisait
     # de connaître l'email d'un acheteur pour lui faire cracher son numéro de
