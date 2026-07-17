@@ -16,7 +16,7 @@
 >
 > | Fichier | Rôle | Coût |
 > |---|---|---|
-> | [`ETAT.md`](ETAT.md) | **État vivant** — où on en est, quoi faire, pièges | ~2,6k tok |
+> | [`ETAT.md`](ETAT.md) | **État vivant** — où on en est, quoi faire, pièges | ~2,7k tok |
 > | [`ROADMAP_REMEDIATION.md`](ROADMAP_REMEDIATION.md) | Le plan — 5 sprints, gates, DoD | ~6k tok |
 > | `SUIVI_PROJET.md` (ici) | **Historique & décisions** — pourquoi les choix ont été faits | ~7k tok |
 >
@@ -30,7 +30,7 @@
 > Ce qu'elle annonçait est fait : le travail décrit ci-dessous a été commité et poussé
 > le 2026-07-16 (branche `chantier/live-delivery-admin`), PayDunya est abandonné au
 > profit de **GeniusPay** (câblé le 2026-07-17), et la suite est passée de 33 à
-> **153 tests**.
+> **167 tests**.
 
 **Dernier commit poussé** : `a9f19b1` — `test(e2e): tunnel d'achat Playwright + point de reprise suivi` (branche `main`, poussé en début de session 3).
 
@@ -118,9 +118,9 @@ frontend au vrai backend** (l'admin pilote un événement, le client le voit et 
 de vraies données de bout en bout).
 
 **Reste bloquant avant prod** (état au 2026-07-17 — voir [`ETAT.md`](ETAT.md)) :
-1. **Livraison des billets sans retry** — client payé + Resend indisponible = billet jamais reçu.
-   Le vrai risque du jour J (T3.10).
-2. **Aucun backup** — une billetterie sans sauvegarde perd la liste des payants.
+1. **Aucun backup** — une billetterie sans sauvegarde perd la liste des payants. **Le prochain
+   risque à traiter** (T3.5).
+2. ~~Livraison sans retry~~ — **réglé** (T3.10, outbox transactionnel).
 3. **Aucune observabilité** — Sentry différé : rien ne dira ce qui casse.
 4. **Pas déployable** — ni `compose.prod`, ni Dockerfile frontend ; le backend tourne en root.
 5. **Clés GeniusPay à poser** — le digital est câblé mais le stub reste actif tant qu'elles
@@ -189,9 +189,9 @@ npm --prefix e2e run test
 | 1 | Sécurité socle | 🟢 **Terminé (S2)** — 36 → **2 advisories** (les 3 atteignables sans auth ont disparu) ; écrasement de participant, fuite PII, Turnstile silencieux et IP d'audit falsifiable : fermés. Reste : sanitisation backend + Next 16 (S4) |
 | 2 | Paiement complet | 🟡 **GeniusPay câblé** — provider + webhook signé + 41 tests ; `payment.refunded` traité. Barème des frais extrait et testé. **Reste : poser les clés (+ le `whsec_` sandbox) et un tunnel pour tester en local** |
 | 3 | Intégration front↔back | 🟢 **Terminé** (admin + public + WS temps réel + ISR étendue + next/image ; reste : endpoint comms externe) |
-| 4 | Livraison billets & comms | 🟡 **email_service (Resend) + WhatsApp écrits** — mais **AUCUN retry** : client payé + Resend down = billet jamais reçu. C'est le vrai risque du jour J (T3.10) |
-| 5 | DevOps / prod | 🔴 **S3 — le prochain sprint.** compose prod, Dockerfile front (le back tourne en **root**), nginx/SSL, **backups (aucun)**, `/health` réel, limiter Redis. ⏸️ Sentry différé : **rien ne dira ce qui casse en prod** |
-| 6 | Tests & QA | 🟢 **153 tests verts** (33 → 153), les nouveaux **mutation-testés**. CI : `build` + couverture **60 %** + `pip-audit` **bloquants**. ⚠️ Les « 32 verts » annoncés jusqu'ici étaient **faux** : à la 1ʳᵉ exécution réelle, la suite était à **20 échecs**. Reste : e2e en CI, tests de charge |
+| 4 | Livraison billets & comms | 🟢 **Fiabilisée (T3.10)** — outbox transactionnel : le job naît dans la transaction du billet, retry backoff ×5, dead-letter visible + alerte admin. Le billet ne peut plus se perdre. Reste : n8n (rappels J-7…J+7), endpoint Communications |
+| 5 | DevOps / prod | 🟡 **S3 en cours** — T3.10 fait. Reste : **backups (aucun — prochain)**, Dockerfile durci (le back tourne en **root**), compose prod, Dockerfile front, `/health` réel, limiter Redis. ⏸️ Sentry différé : **rien ne dira ce qui casse en prod** |
+| 6 | Tests & QA | 🟢 **167 tests verts** (33 → 167), les nouveaux **mutation-testés**. CI : `build` + couverture **60 %** + `pip-audit` **bloquants**. ⚠️ Les « 32 verts » annoncés jusqu'ici étaient **faux** : à la 1ʳᵉ exécution réelle, la suite était à **20 échecs**. Reste : e2e en CI, tests de charge |
 | 7 | Déploiement + docs + formation | 🔴 À faire |
 | v2 | Streaming live | 🟡 **Plus différé** — `live.py`, `live_notifier`, pages front existent. Le gate d'accès a été réparé (3 défauts, 0 test auparavant) |
 
@@ -390,10 +390,10 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 
 | Sujet | État |
 |---|---|
-| Tests automatisés | 🟢 **153 tests backend verts** (33 → 153), les nouveaux **mutation-testés** ; couverture **64 %** (seuil CI 60 %) ; + Playwright e2e (3) ; restent **e2e-en-CI + tests de charge** |
+| Tests automatisés | 🟢 **167 tests backend verts** (33 → 167), les nouveaux **mutation-testés** ; couverture **64 %** (seuil CI 60 %) ; + Playwright e2e (3) ; restent **e2e-en-CI + tests de charge** |
 | **Suite aveugle aux migrations oubliées** | 🔴 `conftest` construit le schéma via `Base.metadata.create_all` (modèle), jamais via Alembic → prod cassée / CI verte. Angle mort structurel |
 | **Pas de mock des dépendances externes** | 🟠 un test joignait la prod ; neutralisé au cas par cas, aucune stratégie globale |
-| **Livraison sans retry** (`send_tickets_bg`) | 🔴 client payé + Resend down = billet jamais reçu, seule alerte = notif WS en direct. **Vrai risque du jour J** (T3.10) |
+| ~~Livraison sans retry~~ | 🟢 **Réglé (T3.10)** — outbox transactionnel + retry + dead-letter |
 | Dépendances vulnérables | 🔴 36 advisories py — jose/multipart/starlette **atteignables sans auth** ; 4 high npm (menace réelle < chiffre brut, cf. `ETAT.md`) |
 | Backups PostgreSQL | 🔴 **aucun** |
 | **WS notifications single-process** (hub in-memory) | 🟡 multi-worker gunicorn ⇒ backplane **Redis pub/sub** requis (§6) |
@@ -436,6 +436,47 @@ et **achat manuel complet** (remplir le formulaire → `POST /orders/` → comma
 ---
 
 ## 9. Changelog
+
+### 2026-07-17 — Sprint S3 démarré : T3.10, la livraison ne peut plus perdre un billet (167 tests)
+
+**Le défaut le plus grave du projet est éliminé.** `send_tickets_bg` envoyait en direct, sans
+retry : Resend indisponible 30 secondes = **billet jamais reçu**, argent encaissé, aucune trace.
+La seule alerte était une notification WebSocket qu'un admin devait voir *en direct*.
+
+> 🔁 **Décision d'architecture — outbox Postgres, pas la « file Redis » de la roadmap.**
+>
+> Le job de livraison doit naître dans la **même transaction** que le billet. Redis ne peut pas
+> participer à une transaction Postgres : on retomberait exactement sur la course qu'on corrige —
+> enqueue puis rollback (*livraison fantôme*), ou commit puis enqueue perdu (*billet jamais livré*).
+> Postgres donne l'atomicité gratuitement, n'ajoute **aucune infra à déployer** (il n'y a pas encore
+> de `compose.prod`), et sera sauvegardé avec le reste en T3.5.
+>
+> Redis reste le bon choix pour ce qui n'a pas besoin d'être transactionnel : le rate-limiter
+> (T3.6) et le backplane WS (T3.7). **NB : Redis est provisionné depuis le début et n'est utilisé
+> nulle part dans le code** — T3.6 sera sa première utilisation réelle.
+
+- **`delivery_jobs`** (migration `0005`) — 1 ligne par (commande, canal).
+  `UNIQUE(order_id, channel)` = idempotence **structurelle** : un rejeu de webhook ne peut pas
+  produire deux envois, c'est la base qui refuse, pas du code qu'on peut oublier.
+- **`generate_for_order` programme la livraison dans SA transaction.** Si la commande rollback, le
+  job n'existe pas ; si elle commit, la livraison *sera* tentée et retentée. **Il n'y a plus de
+  fenêtre.**
+- **Boucle de fond (20 s)** en `FOR UPDATE SKIP LOCKED` → sûre en multi-worker, contrairement à la
+  réconciliation qui refait le même travail dans chaque worker.
+- **Retry** backoff exponentiel (30 s → 8 min, 5 essais), porté par `next_attempt_at` et non par un
+  `sleep` : un redémarrage en plein vol ne perd rien.
+- **Dead letter** après 5 échecs : plus de tentative automatique + alerte admin. L'abandon devient
+  **visible** (une ligne en base) au lieu d'être silencieux. `/tickets/resend` la réanime — sinon
+  elle serait un cul-de-sac sans recours pour l'acheteur.
+- **Supprimé** : `send_tickets_bg` (133 lignes) et ses 4 appelants, dont l'`asyncio.create_task`
+  qui causait la course. **Plus aucun fire-and-forget : la garantie vient du commit, plus de
+  l'ordre d'exécution.**
+- Bugs trouvés en chemin : `email_service.aclose()` **manquait dans le lifespan** (il fuyait son
+  client httpx — dette signalée à l'audit) ; le lien live utilisait un **domaine en dur** au lieu
+  de `settings.FRONTEND_URL`, donc un billet émis en staging pointait vers la production.
+- 14 tests, dont `test_rollback_leaves_no_phantom_job` (l'atomicité) et
+  `test_one_channel_failing_does_not_block_the_other` (jobs par canal : un retry ne renvoie pas
+  l'email déjà livré). Vérifié en live : `FROM delivery_jobs` observé dans les logs.
 
 ### 2026-07-17 — Sprint S2 : durcissement (153 tests, 36 → 2 advisories)
 - **Dépendances : 36 → 2 advisories.** `python-jose` 3.3→3.4 (confusion d'algo + DoS ; c'est la
