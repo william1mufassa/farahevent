@@ -28,9 +28,9 @@ FarahEvent = billetterie hybride (présentiel + live) pour la Côte d'Ivoire. Fa
 | Backend démarre | ✅ **OUI** | `docker compose up` → **`/health` 200**, 0 erreur dans les logs |
 | Schéma DB complet | ✅ **OUI** | migration `0004_live_links_sent` ajoutée (manquait) + réversibilité testée |
 | Travail poussé | ✅ **OUI** | branche `chantier/live-delivery-admin`, 7 commits, sur `origin` |
-| Tests | 🟡 **74** (33 + 41 S1) | les 41 nouveaux verts + mutation-testés. ⚠️ **suite complète non rejouée depuis S1** (Docker arrêté) — la signature de l'ABC `create_checkout` a changé, à confirmer |
+| Tests | ✅ **74/74** | vérifié le 2026-07-17 après S1. Les 41 nouveaux sont **mutation-testés** (signature acceptant tout → 3 échecs ; idempotence retirée → 1 ; anti-rejeu retiré → 2) |
 | CI | ⏳ **non déclenchée** | ne tourne que sur `main` ou PR→`main`. **PR à ouvrir à la main** (`gh` absent) |
-| Encaissement digital | 🟡 **câblé, clés absentes** | code complet + webhook + 41 tests. `GENIUSPAY_API_KEY` vide dans `.env` → le stub reste actif (WARNING au boot). **Action : poser les clés sandbox** |
+| Encaissement digital | 🟡 **câblé, clés absentes** | code + webhook + 41 tests ✅. Clés absentes du `.env` → **le boot logge « Paiement digital : STUB actif »** (vérifié). Dès que les clés sont posées, le log passe à « GeniusPay (mode=test) » — c'est le témoin à regarder |
 | Encaissement manuel | ✅ OK | testé (`test_manual_payments_http.py`) — **seule voie qui marche** |
 | Accès Live | ❌ **CASSÉ** | `live.py:69` exclut `MANUAL_VALIDATED` = tous les clients réels |
 | Destruction tracée | ❌ NON | `/admin/database` sans `audit_service`, MANAGER peut hard-delete |
@@ -122,7 +122,7 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 
 | Date | Session | Fait | État après |
 |---|---|---|---|
-| 2026-07-17 | 4 | **S1 : GeniusPay câblé.** `_select_provider` (GeniusPay si clés, sinon stub + WARNING), `verify_webhook_signature` sur l'ABC en **fail-closed**, route `POST /webhooks/geniuspay` (signature HMAC corps brut + anti-rejeu 5 min + idempotence + livraison via BackgroundTasks = après commit). **4 écarts au contrat corrigés** en confrontant le code à la doc : `mobile_money` inexistant chez GeniusPay → `pawapay` ; `card` valide (remap inutile) ; objet `customer` absent ; min 200 XOF. **Frais réels** désormais stockés. Défaut de paiement inversé. **+41 tests**, mutation-testés. | S1 ~60 % |
+| 2026-07-17 | 4 | **S1 T1.1 ✅ — GeniusPay câblé, 74/74 verts.** `_select_provider` (GeniusPay si clés, sinon stub + WARNING), `verify_webhook_signature` sur l'ABC en **fail-closed**, route `POST /webhooks/geniuspay` (signature HMAC corps brut + anti-rejeu 5 min + idempotence + livraison via BackgroundTasks = après commit). **4 écarts au contrat corrigés** en confrontant le code à la doc : `mobile_money` inexistant chez GeniusPay → `pawapay` ; `card` valide (remap inutile) ; objet `customer` absent ; min 200 XOF. **Frais réels** désormais stockés. Défaut de paiement inversé. **+41 tests**, mutation-testés. | S1 ~60 % (T1.1 clos) |
 | 2026-07-16 | 3 | **S0 ✅.** `.env` réparé → config charge. 97 fichiers en 5 commits, poussés → **travail sauvé** (0 secret, vérifié). **D1 tranchée : GeniusPay (GO).** Stack montée : `/health` 200. **3 bugs trouvés en exécutant** : migration `live_links_sent` manquante (live_notifier plantait en boucle) ; handler d'erreur de la réconciliation qui plante lui-même (`MissingGreenlet` sur instance expirée) ; tâche de livraison collectable par le GC. Tests : **20 échecs → 33/33 verts** (2 passages). Reste : ouvrir la PR (`gh` absent). | **S0 terminé** |
 | 2026-07-16 | 2 | Memory system activé (MemPalace wing + graphify). `iron-system` + superpowers installés. Nettoyage : nginx **rapaté** dans `infra/nginx/`, 6 fichiers périmés archivés → `Desktop/_farahevent_archive_2026-07-16/`, caches purgés. `ROADMAP_REMEDIATION.md` + `ETAT.md` créés. | S0 prêt à démarrer |
 | 2026-07-16 | 1 | Audit complet 11 dimensions → **5,5/10**, 5 bloquants vérifiés par exécution. | Audit livré |
