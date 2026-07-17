@@ -45,12 +45,17 @@ class Settings(BaseSettings):
     PAYDUNYA_MODE: str = "test"  # test / live
     PAYDUNYA_API_URL: str = "https://app.paydunya.com/api/v1"
 
-    # GeniusPay (Digital payments)
-    GENIUSPAY_API_KEY: str = ""
-    GENIUSPAY_SECRET_KEY: str = ""
+    # GeniusPay — paiement digital (mobile money + carte, Côte d'Ivoire).
+    # Doc : https://pay.genius.ci/doc — auth par 2 headers (X-API-Key / X-API-Secret).
+    GENIUSPAY_API_KEY: str = ""       # pk_sandbox_… / pk_live_…
+    GENIUSPAY_SECRET_KEY: str = ""    # sk_sandbox_… / sk_live_… — jamais exposé au client
+    # Racine de l'API. Le provider lit CE réglage (et pas un GENIUSPAY_BASE_URL qui
+    # n'a jamais existé) : une seule source de vérité pour l'URL.
     GENIUSPAY_API_URL: str = "https://geniuspay.ci/api/v1/merchant"
-    GENIUSPAY_WEBHOOK_URL: str = ""
-    GENIUSPAY_MODE: str = "test"
+    # Secret de signature des webhooks (whsec_…), DISTINCT des clés d'API et distinct
+    # entre sandbox et production. Vide => les webhooks sont tous rejetés (fail-closed).
+    GENIUSPAY_WEBHOOK_SECRET: str = ""
+    GENIUSPAY_MODE: str = "test"      # test / live
 
     # OpenWA (WhatsApp)
     OPENWA_API_URL: str = "https://wa.farahevent.tech"

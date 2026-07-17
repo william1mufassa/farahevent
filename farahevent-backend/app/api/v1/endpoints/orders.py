@@ -31,7 +31,7 @@ from app.models.order import Order
 from app.models.participant import Participant
 from app.models.payment_config import PaymentConfig
 from app.schemas.order import OrderCreateRequest, OrderCreateResponse, OrderPublicStatus
-from app.services.payment_provider import payment_provider
+from app.services.payment_provider import CustomerInfo, payment_provider
 from app.services.notification_hub import manual_payment_notification, notification_hub
 from app.services.upload_service import upload_service
 from app.services.turnstile_service import turnstile_service
@@ -128,10 +128,29 @@ async def create_order(
             cancel_url=f"{settings.FRONTEND_URL}/paiement/echec?order_id={order.id}",
             webhook_url=f"{settings.API_URL}/webhooks/{payment_provider.name}",
             payment_method=data.payment_method_label,
+            # Le provider route le mobile money vers le bon opérateur à partir du
+            # numéro : sans lui, l'acheteur doit le ressaisir chez le provider.
+            customer=CustomerInfo(
+                name=participant.full_name,
+                email=participant.email,
+                phone=participant.whatsapp,
+                country=participant.country,
+            ),
         )
         order.payment_provider = session_result.provider
         order.payment_provider_checkout_id = session_result.checkout_id
         checkout_url = session_result.checkout_url
+
+        # Frais RÉELS annoncés par le provider, conservés à côté de notre estimation.
+        # Nos frais sont calculés à partir d'un barème figé dans le code ; seuls
+        # ceux-ci réconcilieront avec le relevé. Les stocker permet de mesurer
+        # l'écart au lieu de le découvrir en comptabilité (audit §11).
+        if session_result.fees is not None:
+            meta = dict(order.metadata_ or {})
+            meta["provider_fee_amount"] = session_result.fees
+            meta["provider_net_amount"] = session_result.net_amount
+            meta["fee_estimate_delta"] = round(session_result.fees - float(fee), 2)
+            order.metadata_ = meta
 
     manual_hint = (
         f"{settings.FRONTEND_URL}/paiement/manuel?order_id={order.id}"
@@ -346,8 +365,14 @@ async def _load_payment_config_or_default(db: AsyncSession, event_id) -> Payment
     cfg = result.scalar_one_or_none()
     if cfg:
         return cfg
-    # Défaut si l'admin n'a pas encore configuré : digital ouvert, manuel fermé
-    return PaymentConfig(event_id=event_id, is_digital_enabled=True, is_manual_enabled=False)
+    # Défaut quand l'admin n'a rien configuré : LES DEUX modes ouverts.
+    #
+    # L'ancien défaut (digital seul) rendait tout nouvel événement invendable dès
+    # que le digital était indisponible — l'acheteur atterrissait sur une page
+    # d'attente sans issue, et le manuel, seule voie réellement fonctionnelle,
+    # était fermé (audit 2026-07-16). Un défaut ne doit jamais fermer l'unique
+    # chemin qui marche.
+    return PaymentConfig(event_id=event_id, is_digital_enabled=True, is_manual_enabled=True)
 
 
 def _validate_channel_for_event(formula: Formula, event: Event):
