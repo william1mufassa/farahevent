@@ -132,6 +132,9 @@ Après un changement de code : `graphify update .` (0 token LLM, ~30 s).
 ## 🔄 Protocole de mise à jour de ce fichier
 
 **À chaque fin de session, en 2 minutes :**
+0. **`graphify update .`** (~30 s, 0 token LLM). Le graphe **ne se met pas à jour tout seul** :
+   au 2026-07-17 il avait 10 commits de retard et décrivait encore `GeniusPayProvider` comme du
+   code mort — il était devenu une source d'hallucination au lieu d'un garde-fou.
 1. Ajouter **1 ligne** au Journal (date, ce qui a été fait, état après).
 2. Mettre à jour le tableau **État vérifié** — uniquement des faits **prouvés par une commande**,
    jamais « je pense que ça marche ».
