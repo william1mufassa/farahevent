@@ -46,10 +46,20 @@ async function handler(request: NextRequest) {
       : await request.arrayBuffer();
   const contentType = request.headers.get('content-type');
 
+  // IP réelle de l'admin, telle que nginx l'a écrite. Le proxy reconstruit les
+  // headers à zéro (volontairement : rien du navigateur ne doit fuiter vers
+  // l'API) — mais du coup rien n'atteignait le backend, qui retombait sur
+  // `request.client.host`, c'est-à-dire l'IP de CE serveur Next. Toutes les
+  // actions admin portaient donc la même IP inutile dans l'audit trail.
+  // `x-real-ip` est écrasé par nginx avec le pair TCP : le client ne peut pas le
+  // forger. On ne relaie que celui-là, jamais un XFF venu du navigateur.
+  const realIp = request.headers.get('x-real-ip');
+
   const forward = async (token: string | null): Promise<Response> => {
     const headers = new Headers();
     if (contentType) headers.set('content-type', contentType);
     if (token) headers.set('authorization', `Bearer ${token}`);
+    if (realIp) headers.set('x-real-ip', realIp);
     return fetch(url, { method: request.method, headers, body, cache: 'no-store' });
   };
 

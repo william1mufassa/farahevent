@@ -130,6 +130,21 @@ class Settings(BaseSettings):
             problems.append("TICKET_SIGNING_KEY doit être défini (≥32 caractères)")
         elif self.TICKET_SIGNING_KEY == self.SECRET_KEY:
             problems.append("TICKET_SIGNING_KEY doit être DIFFÉRENT de SECRET_KEY")
+        if not self.TURNSTILE_SECRET_KEY:
+            # `turnstile_service.verify` fait `if not self.enabled: return True` —
+            # sans clé, TOUT jeton passe, y compris absent. L'anti-bot du tunnel
+            # d'achat serait donc désactivé en prod sans le moindre signal : rien
+            # dans les logs, rien dans l'UI, juste des commandes de robots. Une
+            # protection qui s'éteint en silence est pire que pas de protection.
+            problems.append(
+                "TURNSTILE_SECRET_KEY doit être défini en production "
+                "(vide = anti-bot silencieusement désactivé sur /orders)"
+            )
+        if not self.REVALIDATE_SECRET:
+            # Sans secret partagé, `revalidate_service` appelle le frontend sans
+            # authentifier l'invalidation ISR : les pages publiques cesseraient de
+            # se rafraîchir après une édition CMS, sans erreur visible.
+            problems.append("REVALIDATE_SECRET doit être défini en production")
         if problems:
             raise ValueError(
                 "Configuration de production invalide :\n  - " + "\n  - ".join(problems)
